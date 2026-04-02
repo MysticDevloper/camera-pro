@@ -22,7 +22,7 @@ public partial class App : Application
     {
         Services = ServiceConfiguration.ConfigureServices();
         
-        LoggingSetup.Initialize();
+        LoggingSetup.Configure();
         
         AppDomain.CurrentDomain.UnhandledException += GlobalExceptionHandler.Handle;
         
@@ -34,7 +34,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        LoggingSetup.Shutdown();
+        LoggingSetup.CloseAndFlush();
         base.OnExit(e);
     }
 }
