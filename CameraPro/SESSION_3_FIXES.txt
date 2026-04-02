@@ -1,0 +1,325 @@
+================================================================================
+                    SESSION 3: VIDEO RECORDING FIXES
+================================================================================
+
+⚠️ CRITICAL: This is broken - frames are NOT being written to video!
+
+ISSUES TO FIX:
+
+================================================================================
+ISSUE 1: RECORDING NOT CONNECTED TO CAMERA
+================================================================================
+PROBLEM:
+- VideoRecorder.WriteFrame() exists but never called
+- CameraManager doesn't send frames to recorder
+- No integration between camera and recording
+
+SOLUTION:
+Create a recording bridge service. File: C:/CAMERA/CameraPro/CameraPro.Recording/CameraRecorderBridge.cs
+
+```csharp
+using CameraPro.Core.Interfaces;
+using CameraPro.Core.Models;
+using Serilog;
+using System.Windows.Media.Imaging;
+using System.IO;
+
+namespace CameraPro.Recording;
+
+public class CameraRecorderBridge : IDisposable
+{
+    private readonly ICameraManager _cameraManager;
+    private readonly IVideoRecorder _videoRecorder;
+    private readonly ILogger _logger;
+    private bool _isRecording;
+
+    public CameraRecorderBridge(ICameraManager cameraManager, IVideoRecorder videoRecorder)
+    {
+        _cameraManager = cameraManager;
+        _videoRecorder = videoRecorder;
+        _logger = Log.ForContext<CameraRecorderBridge>();
+        
+        // Subscribe to frame available event
+        _cameraManager.FrameAvailable += OnFrameAvailable;
+    }
+
+    private void OnFrameAvailable(object? sender, BitmapSource frame)
+    {
+        if (!_isRecording || !_videoRecorder.IsRecording)
+            return;
+
+        try
+        {
+            // Convert BitmapSource to byte array for FFmpeg
+            var frameData = ConvertBitmapSourceToYuv(frame);
+            if (frameData != null)
+            {
+                _videoRecorder.WriteFrame(frameData);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Error writing frame to recorder");
+        }
+    }
+
+    private byte[]? ConvertBitmapSourceToYuv(BitmapSource frame)
+    {
+        try
+        {
+            // Convert to formatted (Bgra32) bitmap first
+            var formatted = new FormatConvertedBitmap();
+            formatted.BeginInit();
+            formatted.Source = frame;
+            formatted.DestinationFormat = System.Windows.Media.PixelFormats.Bgra32;
+            formatted.EndInit();
+            formatted.Freeze();
+
+            int width = formatted.PixelWidth;
+            int height = formatted.PixelHeight;
+            int stride = width * 4;
+            byte[] pixels = new byte[height * stride];
+
+            formatted.CopyPixels(pixels, stride, 0);
+
+            // Convert BGRA to YUV420P format for FFmpeg
+            return ConvertBgraToYuv420(pixels, width, height);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to convert frame");
+            return null;
+        }
+    }
+
+    private byte[] ConvertBgraToYuv420(byte[] bgra, int width, int height)
+    {
+        int ySize = width * height;
+        int uvSize = ySize / 4;
+        byte[] yuv = new byte[ySize + uvSize * 2];
+
+        // Convert each pixel
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int idx = y * width * 4 + x * 4;
+                byte b = bgra[idx];
+                byte g = bgra[idx + 1];
+                byte r = bgra[idx + 2];
+
+                // Y plane
+                int yVal = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
+                yuv[y * width + x] = (byte)Math.Clamp(yVal, 0, 255);
+            }
+        }
+
+        // Downsample and convert U and V
+        for (int y = 0; y < height; y += 2)
+        {
+            for (int x = 0; x < width; x += 2)
+            {
+                int idx = y * width * 4 + x * 4;
+                byte b = bgra[idx];
+                byte g = bgra[idx + 1];
+                byte r = bgra[idx + 2];
+
+                int uVal = ((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128;
+                int vVal = ((112 * r - 94 * g - 18 * b + 128) >> 8) + 128;
+
+                int uvIdx = ySize + (y / 2) * width + x;
+                yuv[uvIdx] = (byte)Math.Clamp(uVal, 0, 255);
+                yuv[uvIdx + 1] = (byte)Math.Clamp(vVal, 0, 255);
+            }
+        }
+
+        return yuv;
+    }
+
+    public async Task<bool> StartRecordingAsync(string outputPath, CaptureSettings settings)
+    {
+        try
+        {
+            _isRecording = true;
+            _videoRecorder.StartRecording(outputPath, settings);
+            _logger.Information("Recording started: {Path}", outputPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to start recording");
+            _isRecording = false;
+            return false;
+        }
+    }
+
+    public RecordingSession StopRecording()
+    {
+        _isRecording = false;
+        var session = _videoRecorder.StopRecording();
+        _logger.Information("Recording stopped: {Path}", session.FilePath);
+        return session;
+    }
+
+    public void Dispose()
+    {
+        _cameraManager.FrameAvailable -= OnFrameAvailable;
+        if (_isRecording)
+        {
+            StopRecording();
+        }
+    }
+}
+```
+
+================================================================================
+ISSUE 2: VERIFY IVideoRecorder.cs
+================================================================================
+File: C:/CAMERA/CameraPro/src/CameraPro.Core/Interfaces/IVideoRecorder.cs
+
+```csharp
+using CameraPro.Core.Models;
+
+namespace CameraPro.Core.Interfaces;
+
+public interface IVideoRecorder
+{
+    void StartRecording(string path, CaptureSettings settings);
+    RecordingSession StopRecording();
+    void PauseRecording();
+    void ResumeRecording();
+    void WriteFrame(byte[] frameData);
+    bool IsRecording { get; }
+    bool IsPaused { get; }
+    RecordingStatus Status { get; }
+    
+    event EventHandler<RecordingStatus>? StatusChanged;
+    event EventHandler<TimeSpan>? DurationUpdated;
+    event EventHandler<long>? FileSizeUpdated;
+    event EventHandler<RecordingSession>? RecordingComplete;
+}
+```
+
+================================================================================
+ISSUE 3: VERIFY EncoderManager.cs
+================================================================================
+File: C:/CAMERA/CameraPro/src/CameraPro.Recording/EncoderManager.cs
+
+Must build proper FFmpeg arguments with rawvideo input format:
+
+```csharp
+public string BuildFFmpegArgs(EncoderSettings settings, int width, int height, double frameRate, string outputPath)
+{
+    var videoBitrate = settings.VideoBitrate / 1000;
+    var audioBitrate = settings.AudioBitrate / 1000;
+
+    var rateControl = settings.BitrateMode == BitrateMode.CBR
+        ? $"-b:v {videoBitrate}k -minrate {videoBitrate}k -maxrate {videoBitrate}k"
+        : $"-b:v {videoBitrate}k";
+
+    // CRITICAL: -f rawvideo tells FFmpeg to expect raw bytes
+    return $"-f rawvideo -vcodec rawvideo -s {width}x{height} -r {frameRate} -pix_fmt yuv420p -i - " +
+           $"-c:v {settings.VideoCodec} {rateControl} " +
+           $"-pix_fmt yuv420p -y \"{outputPath}\"";
+}
+```
+
+================================================================================
+ISSUE 4: UPDATE ServiceConfiguration.cs
+================================================================================
+File: C:/CAMERA/CameraPro/CameraPro.App/ServiceConfiguration.cs
+
+Add the bridge service:
+
+```csharp
+services.AddSingleton<CameraRecorderBridge>();
+services.AddSingleton<IVideoRecorder, VideoRecorder>();
+```
+
+================================================================================
+ISSUE 5: UPDATE MainWindow.xaml.cs
+================================================================================
+File: C:/CAMERA/CameraPro/CameraPro.App/MainWindow.xaml.cs
+
+Add IVideoRecorder and CameraRecorderBridge:
+
+```csharp
+private readonly IVideoRecorder _videoRecorder;
+private readonly CameraRecorderBridge _recorderBridge;
+
+// In constructor:
+_videoRecorder = App.Services.GetRequiredService<IVideoRecorder>();
+_recorderBridge = App.Services.GetRequiredService<CameraRecorderBridge>();
+
+// Update StartRecording():
+private async void StartRecording()
+{
+    try
+    {
+        var settings = new CaptureSettings
+        {
+            Resolution = new Resolution { Width = 1920, Height = 1080 },
+            FrameRate = 30
+        };
+        
+        var outputPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+            "CameraPro",
+            DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".mp4");
+        
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        
+        await _recorderBridge.StartRecordingAsync(outputPath, settings);
+        
+        // ... UI updates
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Failed to start recording");
+    }
+}
+
+// Update StopRecording():
+private void StopRecording()
+{
+    var session = _recorderBridge.StopRecording();
+    // ... UI updates
+}
+```
+
+================================================================================
+ISSUE 6: FIX CheckAutoStopLimits() 
+================================================================================
+File: C:/CAMERA/CameraPro/src/CameraPro.Recording/RecordingController.cs
+
+The method at line 158-160 is EMPTY. Implement it:
+
+```csharp
+private void CheckAutoStopLimits()
+{
+    // Check duration limit (e.g., 30 minutes)
+    if (_maxDuration.HasValue && _currentDuration >= _maxDuration.Value)
+    {
+        StopRecording();
+        Warning?.Invoke(this, "Maximum recording duration reached");
+        return;
+    }
+    
+    // Check file size limit (e.g., 2GB)
+    if (_maxFileSize.HasValue && _currentFileSize >= _maxFileSize.Value)
+    {
+        StopRecording();
+        Warning?.Invoke(this, "Maximum file size reached");
+    }
+}
+```
+
+================================================================================
+DELIVERABLES:
+✅ CameraRecorderBridge connects camera to recorder
+✅ BitmapSource to YUV420 conversion working
+✅ FFmpeg receives raw frames
+✅ Recording creates valid video file
+✅ Auto-stop limits implemented
+✅ Service properly registered
+================================================================================

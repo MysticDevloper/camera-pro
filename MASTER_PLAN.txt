@@ -1,0 +1,917 @@
+================================================================================
+                           CAMERA PRO - MASTER PLAN
+                         Advanced Windows Camera App
+================================================================================
+
+PROJECT LOCATION: C:/CAMERA/CameraPro/
+TECHNOLOGY: C# / .NET 8 / WinUI 3
+
+================================================================================
+                    ⚠️ CRITICAL ISSUES FOUND ⚠️
+================================================================================
+
+All sessions marked [NEEDS FIX] - read SESSION_X_FIXES.txt files!
+
+TOP 3 PRIORITIES:
+
+1. UI FRAMEWORK CONFLICT (Session 1)
+   - CameraPro.App uses WPF
+   - CameraPro.UI uses WinUI3
+   → Delete one, keep the other!
+
+2. DUPLICATE FILES IN Core PROJECT (Session 1)
+   - AppConfig.cs exists twice
+   - GlobalExceptionHandler.cs exists twice
+   - LoggingSetup.cs exists twice
+   → Delete duplicates!
+
+3. INTEGRATION NOT WORKING (All Sessions)
+   - Filters not connected to camera
+   - Recording not receiving frames
+   - PhotoCapture uses concrete class
+   → Connect all services!
+
+See C:/CAMERA/CameraPro/SESSION_X_FIXES.txt for details.
+
+================================================================================
+                    ⭐ HOW TO IDENTIFY YOUR SESSION ⭐
+================================================================================
+
+STEP 1: Open C:/CAMERA/MASTER_PLAN.txt
+
+STEP 2: Scroll down to "TASK STATUS" section at the bottom
+
+STEP 3: Find your session that shows [ ] NOT STARTED
+
+STEP 4: That is YOUR session. Do ONLY that work.
+
+STEP 5: When done, change [ ] to [DONE] in TASK STATUS
+
+EXAMPLE - If Session 3 is NOT STARTED:
+[DONE] Session 3: Video Recording
+    → You are SESSION 3
+    → Read the SESSION 3 section above
+    → Do only Session 3 tasks
+
+================================================================================
+                              HOW TO USE THIS FILE
+================================================================================
+
+1. Open THIS FILE (C:/CAMERA/MASTER_PLAN.txt)
+2. Identify yourself (see instructions above)
+3. Read your session section only
+4. Do ONLY your assigned tasks
+5. Check TASK STATUS section at bottom
+6. Mark [DONE] when complete
+7. NEVER touch files from other sessions
+8. If you're unsure, re-read the TASK STATUS section
+
+================================================================================
+                              PROJECT STRUCTURE
+================================================================================
+
+C:/CAMERA/CameraPro/
+├── src/
+│   ├── CameraPro.Core/           ← Shared models, interfaces
+│   │   ├── Models/
+│   │   ├── Interfaces/
+│   │   └── Enums/
+│   │
+│   ├── CameraPro.Camera/         ← Session 2: Camera engine
+│   │   ├── CameraManager.cs
+│   │   ├── DeviceEnumerator.cs
+│   │   └── PreviewPipeline.cs
+│   │
+│   ├── CameraPro.Recording/      ← Session 3: Video recording
+│   │   ├── VideoRecorder.cs
+│   │   ├── EncoderManager.cs
+│   │   └── RecordingController.cs
+│   │
+│   ├── CameraPro.Capture/        ← Session 4: Photo capture
+│   │   ├── PhotoCapture.cs
+│   │   ├── BurstMode.cs
+│   │   └── TimerMode.cs
+│   │
+│   ├── CameraPro.MultiCamera/    ← Session 5: Multi-camera
+│   │   ├── MultiCameraManager.cs
+│   │   ├── PiPLayout.cs
+│   │   └── SyncController.cs
+│   │
+│   ├── CameraPro.Controls/       ← Session 6: Camera controls
+│   │   ├── ExposureControl.cs
+│   │   ├── FocusControl.cs
+│   │   └── WhiteBalanceControl.cs
+│   │
+│   ├── CameraPro.Filters/        ← Session 7: Filters & effects
+│   │   ├── FilterPipeline.cs
+│   │   ├── ColorFilters.cs
+│   │   └── EffectsProcessor.cs
+│   │
+│   ├── CameraPro.Storage/        ← Session 8: Storage & export
+│   │   ├── FileManager.cs
+│   │   ├── MediaLibrary.cs
+│   │   └── ExportService.cs
+│   │
+│   └── CameraPro.UI/             ← Session 9: User interface
+│       ├── MainWindow.xaml
+│       ├── ViewModels/
+│       └── Controls/
+│
+├── CameraPro.App/                ← Entry point (Session 9 creates)
+│
+└── CameraPro.sln                 ← Solution file (Session 1 creates)
+
+================================================================================
+                         SESSION 1: PROJECT FOUNDATION
+================================================================================
+
+ASSIGNED TO: Session 1
+FOLDER: C:/CAMERA/CameraPro/
+
+TASKS:
+------
+
+1.1 CREATE SOLUTION STRUCTURE
+   - Create CameraPro.sln
+   - Create these projects in solution:
+     * CameraPro.Core (Class Library)
+     * CameraPro.Camera (Class Library)
+     * CameraPro.Recording (Class Library)
+     * CameraPro.Capture (Class Library)
+     * CameraPro.MultiCamera (Class Library)
+     * CameraPro.Controls (Class Library)
+     * CameraPro.Filters (Class Library)
+     * CameraPro.Storage (Class Library)
+     * CameraPro.UI (WinUI 3 Desktop)
+     * CameraPro.App (WinUI 3 Desktop App)
+
+1.2 ADD NUGET PACKAGES TO ALL PROJECTS
+   - CommunityToolkit.Mvvm
+   - Microsoft.Extensions.DependencyInjection
+   - Serilog + Serilog.Sinks.File
+   - System.Text.Json
+
+1.3 ADD NUGET PACKAGES TO SPECIFIC PROJECTS
+   - CameraPro.UI: Microsoft.WindowsAppSDK
+   - CameraPro.Filters: OpenCvSharp4.Windows
+   - CameraPro.Recording: Xabe.FFmpeg
+
+1.4 CREATE CORE MODELS (CameraPro.Core/Models/)
+   - CameraDevice.cs:
+     * Id (string)
+     * Name (string)
+     * IsDefault (bool)
+     * SupportedResolutions (List<Resolution>)
+     * SupportedFrameRates (List<double>)
+
+   - Resolution.cs:
+     * Width (int)
+     * Height (int)
+     * ToString() => "1920x1080"
+
+   - CaptureSettings.cs:
+     * Resolution (Resolution)
+     * FrameRate (double)
+     * Format (VideoFormat enum: MP4, MKV, AVI, WEBM)
+
+   - RecordingSession.cs:
+     * Id (Guid)
+     * StartTime (DateTime)
+     * Duration (TimeSpan)
+     * FilePath (string)
+     * FileSizeBytes (long)
+
+   - FilterEffect.cs:
+     * Name (string)
+     * IsEnabled (bool)
+     * Parameters (Dictionary<string, double>)
+
+1.5 CREATE CORE INTERFACES (CameraPro.Core/Interfaces/)
+   - ICameraManager.cs:
+     * GetCameras() -> List<CameraDevice>
+     * StartPreview(cameraId) -> void
+     * StopPreview() -> void
+     * GetCurrentFrame() -> BitmapSource
+     * SetFormat(settings) -> void
+
+   - IVideoRecorder.cs:
+     * StartRecording(path, settings) -> void
+     * StopRecording() -> RecordingSession
+     * PauseRecording() -> void
+     * ResumeRecording() -> void
+
+   - IPhotoCapture.cs:
+     * CapturePhoto() -> string (file path)
+     * CaptureBurst(count) -> List<string>
+     * CaptureWithDelay(seconds) -> string
+
+1.6 CREATE ENUMS (CameraPro.Core/Enums/)
+   - VideoFormat: MP4, MKV, AVI, WEBM
+   - CameraStatus: Disconnected, Connecting, Connected, Error
+   - RecordingStatus: Idle, Recording, Paused, Encoding
+   - FilterType: Grayscale, Sepia, Blur, Sharpen, etc.
+
+1.7 CREATE INFRASTRUCTURE (CameraPro.Core/)
+   - LoggingSetup.cs: Configure Serilog
+   - AppConfig.cs: JSON config management
+   - GlobalExceptionHandler.cs
+
+1.8 SETUP DEPENDENCY INJECTION (CameraPro.App/)
+   - Register all services
+   - Setup IServiceProvider
+
+1.9 CREATE BASIC MAIN WINDOW (CameraPro.App/)
+   - Empty window that compiles
+   - Title: "Camera Pro"
+   - Size: 1280x720
+
+DELIVERABLES:
+- Solution builds without errors
+- Empty WPF window opens
+- Logging works
+- All projects reference correctly
+
+================================================================================
+                         SESSION 2: CAMERA ENGINE
+================================================================================
+
+ASSIGNED TO: Session 2
+FOLDER: C:/CAMERA/CameraPro/CameraPro.Camera/
+
+READS FROM: Session 1 (uses Core models and interfaces)
+UPDATES: Will be used by Sessions 3, 4, 5, 6, 7, 9
+
+TASKS:
+------
+
+2.1 CREATE DEVICE ENUMERATOR
+   - Use Windows.Media.Capture (WinRT)
+   - Enumerate all video capture devices
+   - Get device name, ID, capabilities
+   - Detect plug/unplug events
+
+2.2 IMPLEMENT ICameraManager
+   - CameraManager.cs implementing ICameraManager
+   - Connect to selected camera
+   - Start/stop preview
+   - Get current frame as BitmapSource
+
+2.3 CREATE PREVIEW PIPELINE
+   - PreviewPipeline.cs
+   - Dedicated capture thread
+   - Frame buffering (keep latest frame)
+   - 30fps minimum preview rate
+   - Async frame delivery
+
+2.4 DEVICE SELECTION VIEWMODEL
+   - CameraSelectorViewModel.cs
+   - Cameras list (ObservableCollection<CameraDevice>)
+   - SelectedCamera property
+   - RefreshCommand
+   - CameraStatus property
+
+2.5 EDGE CASES HANDLING
+   - Camera disconnects during preview
+   - Camera in use by another app
+   - Permission denied
+   - Unsupported resolution requested
+   - No cameras found
+
+2.6 INTEGRATION WITH CORE
+   - Register CameraManager in DI
+   - Use CaptureSettings model
+   - Emit proper CameraStatus
+
+DELIVERABLES:
+- List all connected cameras
+- Preview shows live feed
+- Switch between cameras works
+- Graceful error handling
+
+================================================================================
+                         SESSION 3: VIDEO RECORDING
+================================================================================
+
+ASSIGNED TO: Session 3
+FOLDER: C:/CAMERA/CameraPro/CameraPro.Recording/
+
+READS FROM: Sessions 1, 2 (uses Core + CameraManager)
+UPDATES: Will be used by Sessions 8, 9
+
+TASKS:
+------
+
+3.1 CREATE RECORDING STATE MACHINE
+   - States: Idle → Preparing → Recording → Paused → Encoding → Complete
+   - Events: Start, Pause, Resume, Stop
+   - Transitions must be valid
+
+3.2 IMPLEMENT IVideoRecorder
+   - VideoRecorder.cs implementing IVideoRecorder
+   - Use Xabe.FFmpeg for encoding
+   - Support H.264, H.265 codecs
+   - MP4, MKV container formats
+
+3.3 ENCODER MANAGER
+   - EncoderManager.cs
+   - Quality presets:
+     * Low: 2 Mbps
+     * Medium: 8 Mbps
+     * High: 20 Mbps
+     * Ultra: 50 Mbps
+   - Bitrate control (CBR, VBR)
+
+3.4 RECORDING CONTROLLER
+   - RecordingController.cs
+   - StartRecording(outputPath, settings)
+   - Pause/Resume
+   - StopRecording() returns RecordingSession
+   - GetStatus() -> (isRecording, duration, fileSize)
+
+3.5 TIMER & FILE SIZE TRACKER
+   - Real-time duration display
+   - File size estimation
+   - Auto-stop at limit
+   - Warning at 80%
+
+3.6 STORAGE CHECK
+   - Check disk space before recording
+   - Warning if <1GB available
+   - Handle disk full gracefully
+
+3.7 INTEGRATION
+   - Register in DI
+   - Use CameraManager frame output
+   - Emit RecordingStatus events
+
+DELIVERABLES:
+- Record/stop buttons work
+- Video plays in VLC/Media Player
+- All codecs produce valid files
+- File sizes match expected bitrate
+
+================================================================================
+                         SESSION 4: IMAGE CAPTURE
+================================================================================
+
+ASSIGNED TO: Session 4
+FOLDER: C:/CAMERA/CameraPro/CameraPro.Capture/
+
+READS FROM: Sessions 1, 2 (uses Core + CameraManager)
+UPDATES: Will be used by Sessions 8, 9
+
+TASKS:
+------
+
+4.1 IMPLEMENT IPHOTOCAPTURE
+   - PhotoCapture.cs implementing IPhotoCapture
+   - CapturePhoto() saves current frame
+   - Use current resolution
+
+4.2 IMAGE FORMATS
+   - Support JPEG (quality 1-100)
+   - Support PNG (lossless)
+   - Support BMP (uncompressed)
+   - Format selection in settings
+
+4.3 BURST MODE
+   - BurstMode.cs
+   - Capture count: 3, 5, 10, continuous
+   - Parallel saves
+   - Progress indicator
+   - Cancel option
+
+4.4 TIMER MODE
+   - TimerMode.cs
+   - Countdown: 3s, 5s, 10s, custom
+   - Visual countdown on preview
+   - Beep sound option
+
+4.5 FILE NAMING
+   - Template: Photo_{date}_{time}_{counter}.jpg
+   - Example: Photo_2026-04-02_14-30-25_001.jpg
+   - Custom prefix setting
+   - Counter auto-increment
+
+4.6 RESOLUTION OPTIONS
+   - Full native resolution
+   - Presets: 4K, 1080p, 720p
+   - Aspect ratio: 16:9, 4:3, 1:1
+
+4.7 INTEGRATION
+   - Register in DI
+   - Use CameraManager.GetCurrentFrame()
+   - Emit capture events
+
+DELIVERABLES:
+- Single photo saves correctly
+- Burst mode captures all photos
+- Timer countdown works
+- All formats valid
+
+================================================================================
+                         SESSION 5: MULTI-CAMERA
+================================================================================
+
+ASSIGNED TO: Session 5
+FOLDER: C:/CAMERA/CameraPro/CameraPro.MultiCamera/
+
+READS FROM: Sessions 1, 2 (uses Core + CameraManager)
+UPDATES: Will be used by Sessions 9
+
+TASKS:
+------
+
+5.1 MULTI-CAMERA MANAGER
+   - MultiCameraManager.cs
+   - StartMultiCapture(List<cameraIds>)
+   - StopAll()
+   - GetCamera(cameraId) -> ICameraManager
+   - Synchronized frame timestamps
+
+5.2 PICTURE-IN-PICTURE (PiP)
+   - PiPLayout.cs
+   - Main + overlay camera(s)
+   - Position: TopLeft, TopRight, BottomLeft, BottomRight
+   - Size: 10%, 20%, 30%, 40% of main
+   - Border style options
+
+5.3 GRID LAYOUTS
+   - 2x2 grid view
+   - 3x3 grid view
+   - Custom grid (rows x columns)
+   - Aspect ratio preservation
+
+5.4 SPLIT VIEW
+   - Side-by-side horizontal
+   - Side-by-side vertical
+   - Adjustable split position (drag)
+
+5.5 SYNCHRONIZATION
+   - SyncController.cs
+   - Frame sync within 33ms
+   - Same timestamp reference
+   - Drift correction
+
+5.6 MULTI-CAMERA RECORDING
+   - Record all cameras simultaneously
+   - Individual files per camera
+   - Composite (PiP as single file)
+   - Sync metadata
+
+5.7 MULTI-CAMERA PHOTO
+   - Capture from all cameras at once
+   - Single shutter = N photos
+   - Folder per camera
+
+DELIVERABLES:
+- Preview 2+ cameras at once
+- Switch camera layouts
+- Record from multiple cameras
+- PiP renders correctly
+
+================================================================================
+                         SESSION 6: CAMERA CONTROLS
+================================================================================
+
+ASSIGNED TO: Session 6
+FOLDER: C:/CAMERA/CameraPro/CameraPro.Controls/
+
+READS FROM: Sessions 1, 2 (uses Core + CameraManager)
+UPDATES: Will be used by Sessions 7, 9
+
+TASKS:
+------
+
+6.1 CONTROL INTERFACE
+   - ICameraControls.cs:
+     * Exposure { get; set; } (range: -100 to 100)
+     * Focus { get; set; } (range: 0.0 to 1.0)
+     * WhiteBalance { get; set; } (Kelvin: 2000-10000)
+     * Brightness { get; set; } (range: -100 to 100)
+     * Contrast { get; set; } (range: -100 to 100)
+     * Saturation { get; set; } (range: -100 to 100)
+     * Zoom { get; set; } (range: 1.0 to max)
+
+6.2 CONTROL ENUMERATOR
+   - Detect which controls camera supports
+   - Get min/max/step values
+   - Cache per camera
+
+6.3 EXPOSURE CONTROL
+   - ExposureControl.cs
+   - Auto/Manual toggle
+   - Exposure compensation (-2 to +2 EV)
+   - ISO if available
+   - Lock/unlock AE
+
+6.4 FOCUS CONTROL
+   - FocusControl.cs
+   - Auto/Manual/Continuous modes
+   - Manual slider (near to far)
+   - Click-to-focus on preview
+   - Focus peaking overlay (optional)
+
+6.5 WHITE BALANCE CONTROL
+   - WhiteBalanceControl.cs
+   - Presets: Auto, Daylight, Cloudy, Tungsten, Fluorescent
+   - Manual Kelvin (2000K-10000K)
+   - Lock/unlock AWB
+
+6.6 COLOR CONTROLS
+   - Brightness, Contrast, Saturation
+   - Hue rotation
+   - Individual RGB gains
+
+6.7 PRESET SYSTEM
+   - SaveControlPreset(name, settings)
+   - LoadControlPreset(name)
+   - Factory presets: Indoor, Outdoor, LowLight
+   - Per-camera presets
+
+6.8 INTEGRATION
+   - CameraControls.cs combining all
+   - Apply to CameraManager
+   - Register in DI
+
+DELIVERABLES:
+- All sliders work
+- Auto/Manual toggles work
+- Presets save and load
+- Controls apply to preview
+
+================================================================================
+                         SESSION 7: FILTERS & EFFECTS
+================================================================================
+
+ASSIGNED TO: Session 7
+FOLDER: C:/CAMERA/CameraPro/CameraPro.Filters/
+
+READS FROM: Sessions 1, 2, 6 (uses Core + Camera + Controls)
+UPDATES: Will be used by Sessions 9
+
+TASKS:
+------
+
+7.1 FILTER PIPELINE
+   - FilterPipeline.cs
+   - Chain of filters
+   - Add/Remove/Reorder filters
+   - Process frame: Input → Filter1 → Filter2 → ... → Output
+
+7.2 COLOR FILTERS
+   - ColorFilters.cs
+   - Grayscale (average, luminosity, desaturation)
+   - Sepia (warm brown tones)
+   - Negative/Invert
+   - Warm tone (orange shift)
+   - Cool tone (blue shift)
+   - High contrast
+
+7.3 IMAGE ADJUSTMENTS
+   - Adjustments.cs
+   - Brightness (-100 to 100)
+   - Contrast (-100 to 100)
+   - Saturation (-100 to 100)
+   - Hue rotation (0-360)
+   - Gamma correction
+
+7.4 ARTISTIC EFFECTS
+   - EffectsProcessor.cs
+   - Gaussian blur
+   - Sharpen (unsharp mask)
+   - Edge detection (Sobel, Canny)
+   - Posterize (reduce colors)
+   - Pixelate
+   - Vignette
+
+7.5 FILTER PRESETS
+   - Built-in presets:
+     * Portrait: Soft contrast, warm
+     * Landscape: High saturation, vivid
+     * Night: Brightness boost, noise
+     * Vintage: Sepia, vignette
+   - Save custom presets
+   - Export/Import (JSON)
+
+7.6 FACE DETECTION
+   - FaceDetector.cs
+   - Use OpenCV Haar cascades
+   - Draw rectangles around faces
+   - Focus on face (optional)
+
+7.7 TEXT/WATERMARK OVERLAY
+   - TextOverlay.cs
+   - Custom text, font, size, color
+   - Position: Top, Bottom, Custom
+   - Timestamp overlay option
+   - Logo/watermark support
+
+7.8 PERFORMANCE
+   - GPU acceleration via OpenCL (OpenCV)
+   - Async processing
+   - Frame skip on lag
+   - Target: 30fps with 5 filters
+
+7.9 INTEGRATION
+   - Insert filter pipeline in CameraManager preview
+   - Apply to recording frames
+   - Apply to photo capture
+
+DELIVERABLES:
+- Multiple filters stack correctly
+- Real-time preview (30fps)
+- Filters apply to recording
+- Presets work
+
+================================================================================
+                         SESSION 8: STORAGE & EXPORT
+================================================================================
+
+ASSIGNED TO: Session 8
+FOLDER: C:/CAMERA/CameraPro/CameraPro.Storage/
+
+READS FROM: Sessions 1, 3, 4 (uses Recording/Photo output)
+UPDATES: Will be used by Session 9
+
+TASKS:
+------
+
+8.1 FILE MANAGER
+   - FileManager.cs
+   - GetMediaFiles(filter) -> List<MediaFile>
+   - DeleteFile(fileId)
+   - MoveFile(fileId, destination)
+   - CopyFile(fileId, destination)
+   - GetFileInfo(fileId) -> FileMetadata
+
+8.2 MEDIA LIBRARY
+   - MediaLibrary.cs
+   - Scan folders for media
+   - Generate thumbnails
+   - Cache thumbnail data
+   - Search by name/date/type
+
+8.3 FOLDER ORGANIZATION
+   - Auto-organize by date:
+     * C:/Videos/CameraPro/2026/04-April/
+     * C:/Pictures/CameraPro/2026/04-April/
+   - Organize by camera name option
+   - Custom folder templates
+
+8.4 VIDEO CONVERSION
+   - VideoConverter.cs
+   - Convert formats (MP4 ↔ MKV ↔ AVI)
+   - Transcode for compatibility
+   - Compress (reduce file size)
+   - Change resolution
+   - Trim/cut video
+   - Merge clips
+
+8.5 IMAGE EXPORT
+   - ImageExporter.cs
+   - Batch resize (4K, 1080p, 720p)
+   - Format conversion
+   - Batch rename
+   - Apply watermark
+
+8.6 STORAGE STATISTICS
+   - Total space used
+   - Photos vs Videos breakdown
+   - Largest files list
+   - Oldest files list
+   - Duplicate detection
+
+8.7 CLEANUP TOOLS
+   - Delete old files
+   - Move to Recycle Bin
+   - Auto-cleanup rules
+   - Confirmation dialogs
+
+8.8 THUMBNAIL GENERATION
+   - Video thumbnails (first frame)
+   - Image thumbnails (scaled)
+   - Cache location
+   - Regenerate option
+
+8.9 INTEGRATION
+   - Register Recording/Photo output paths
+   - Connect to MediaLibrary
+   - Register in DI
+
+DELIVERABLES:
+- Files organized automatically
+- Media browser shows content
+- Conversion works
+- Statistics display correctly
+
+================================================================================
+                         SESSION 9: USER INTERFACE
+================================================================================
+
+ASSIGNED TO: Session 9
+FOLDER: C:/CAMERA/CameraPro/CameraPro.UI/
+
+READS FROM: Sessions 1-8 (uses everything)
+UPDATES: Final integration
+
+TASKS:
+------
+
+9.1 MAIN WINDOW LAYOUT
+   - MainWindow.xaml
+   - Menu bar: File, Edit, View, Camera, Tools, Help
+   - Toolbar: Camera selector, Resolution, Filters, Controls
+   - Side panel: Collapsible control panels
+   - Bottom bar: Capture buttons, Timer, Grid toggle
+   - Status bar: Camera status, Recording time, Resolution
+
+9.2 PREVIEW COMPONENT
+   - PreviewControl.xaml
+   - Bind to CameraManager frame
+   - Aspect ratio preservation
+   - Fullscreen mode (F11)
+   - Zoom (scroll wheel)
+   - Pan when zoomed
+
+9.3 CAMERA SELECTOR PANEL
+   - Dropdown with camera names
+   - Resolution/fps selector
+   - Multi-camera grid selector
+   - Camera status indicators
+
+9.4 CAPTURE UI
+   - Photo button (large, center)
+   - Timer countdown overlay
+   - Resolution selector
+   - Format selector (JPG/PNG)
+   - Burst mode toggle
+   - Last photo thumbnail
+
+9.5 RECORDING UI
+   - Record button (red dot)
+   - Recording indicator (pulsing)
+   - Timer display
+   - Pause button
+   - File size indicator
+
+9.6 CONTROLS PANEL
+   - Exposure slider + auto toggle
+   - Focus slider + auto toggle
+   - White balance dropdown + Kelvin
+   - Brightness/Contrast/Saturation sliders
+   - Preset save/load buttons
+
+9.7 FILTERS PANEL
+   - Filter thumbnails (live preview)
+   - Selected highlight
+   - Intensity slider
+   - Filter stack list
+   - Add/Remove buttons
+
+9.8 MULTI-CAMERA LAYOUT UI
+   - Layout selector (Single, 2x2, PiP)
+   - Camera arrangement
+   - PiP position selector
+   - Split position slider
+
+9.9 SETTINGS DIALOG
+   - General: Theme, Language, Startup
+   - Storage: Paths, Organization
+   - Camera: Defaults
+   - Recording: Quality presets
+   - Keyboard shortcuts
+   - About
+
+9.10 KEYBOARD SHORTCUTS
+   - Space: Capture photo
+   - R: Record toggle
+   - P: Pause recording
+   - F: Fullscreen
+   - 1-9: Quick filters
+   - Escape: Cancel/Close
+
+9.11 TOAST NOTIFICATIONS
+   - Photo saved
+   - Recording started/stopped
+   - Error messages
+   - Disk space warning
+
+DELIVERABLES:
+- Full working UI
+- All panels functional
+- Keyboard shortcuts work
+- Window resizes properly
+
+================================================================================
+                         SESSION 10: INTEGRATION & POLISH
+================================================================================
+
+ASSIGNED TO: Session 10
+FOLDER: C:/CAMERA/CameraPro/
+
+READS FROM: Sessions 1-9 (reviews all code)
+UPDATES: Final compilation
+
+TASKS:
+------
+
+10.1 INTEGRATION TESTING
+   - Full workflow: Open → Select Camera → Preview → Record → Save → View
+   - Photo workflow
+   - All filter combinations
+   - Multi-camera scenarios
+   - Settings persistence
+
+10.2 BUILD VERIFICATION
+   - Solution builds without errors
+   - All projects compile
+   - NuGet packages restore
+   - No missing references
+
+10.3 PERFORMANCE CHECK
+   - Preview: 30fps minimum
+   - Memory: Stable (no leaks)
+   - CPU: <30% during preview
+   - Startup: <3 seconds
+
+10.4 ERROR HANDLING
+   - Camera disconnect during recording
+   - Disk full
+   - Unsupported format
+   - Multiple instances
+   - Sleep/wake cycle
+
+10.5 FINAL POLISH
+   - UI animations smooth
+   - Loading indicators
+   - Cursor changes
+   - Focus indicators
+   - Tooltips
+
+10.6 PUBLISH SETTINGS
+   - Single-file publish
+   - Self-contained
+   - Ready-to-run .exe
+   - Target: win-x64
+
+10.7 DOCUMENTATION
+   - README.md with features
+   - Keyboard shortcuts list
+   - Troubleshooting guide
+
+10.8 FINAL BUILD
+   - Publish to: C:/CAMERA/CameraPro/publish/
+   - CameraPro.exe ready to run
+   - Test the .exe
+
+DELIVERABLES:
+- Fully working application
+- Compiled .exe in publish folder
+- All features work together
+- Production ready
+
+================================================================================
+                              TASK STATUS
+================================================================================
+
+[NEEDS FIX] Session 1: Project Foundation    → Read SESSION_1_FIXES.txt
+[FIXED]     Session 2: Camera Engine        → Read SESSION_2_FIXES.txt
+[FIXED]     Session 3: Video Recording       → Read SESSION_3_FIXES.txt
+[FIXED]     Session 4: Image Capture         → Read SESSION_4_FIXES.txt
+[FIXED]     Session 5: Multi-Camera         → Read SESSION_5_FIXES.txt
+[FIXED]     Session 6: Camera Controls      → Read SESSION_6_FIXES.txt
+[FIXED]     Session 7: Filters & Effects    → Read SESSION_7_FIXES.txt
+[FIXED]     Session 8: Storage & Export
+[FIXED] Session 9: User Interface       → Read SESSION_9_FIXES.txt
+[FIXED] Session 9: User Interface
+[FIXED] Session 10: Integration & Polish
+[FIXED] Session 10: Integration & Polish
+
+================================================================================
+                              UPDATES LOG
+================================================================================
+
+// Add updates here when changes are made to this file
+// Example:
+v1.9 - 2026-04-02 - Session 10: Integration & Polish completed
+v1.10 - 2026-04-02 - Session 3 FIXED: CameraRecorderBridge, IVideoRecorder updated, auto-stop limits
+v1.10 - 2026-04-02 - Session 2: Camera Engine FIXED - MediaFrameReader, DeviceWatcher, ICameraManager
+v1.11 - 2026-04-02 - Session 6: Camera Controls FIXED - CameraDeviceController, WinRT controls integration
+v1.12 - 2026-04-02 - Session 6: FIXED - SetAutoExposure, SetAutoFocus, SetWhiteBalance, SetBrightness/Contrast/Saturation per SESSION_6_FIXES.txt
+v1.2 - 2026-04-02 - Session 2: Camera Engine completed
+v1.3 - 2026-04-02 - Session 3: Video Recording completed
+v1.4 - 2026-04-02 - Session 4: Image Capture completed
+v1.4a - 2026-04-02 - Session 4: FIXED - async capture, timer cancellation, date organization, burst interval, counter persistence
+v1.14 - 2026-04-02 - Session 4: FIXED - IPhotoCapture interface updated per spec, ICameraManager, service registration verified
+v1.5 - 2026-04-02 - Session 5: Multi-Camera completed
+v1.13 - 2026-04-02 - Session 5: FIXED - MultiCameraManager, PiPLayout, GridLayout, SyncController per spec
+v1.11 - 2026-04-02 - Session 5: Multi-Camera FIXED - Composite frame rendering, PiP layouts, grid layouts, frame sync, composite recording
+v1.6 - 2026-04-02 - Session 6: Camera Controls completed
+v1.7 - 2026-04-02 - Session 7: Filters & Effects completed
+v1.8 - 2026-04-02 - Session 8: Storage & Export completed
+v1.12 - 2026-04-02 - Session 7: FIXED - GetFilteredBitmapSource for preview, GPU/OpenCL support
+v1.15 - 2026-04-02 - Session 7: FIXED - IFilter.cs created, ColorFilters/Adjustments/EffectsProcessor updated per spec, ProcessAndConvertToBitmapSource added
+v1.16 - 2026-04-02 - Session 9: FIXED - App.xaml.cs with DI pattern, ServiceConfiguration with all services, CameraRecorderBridge, FilterService integration, async photo capture, keyboard shortcuts
+
+================================================================================

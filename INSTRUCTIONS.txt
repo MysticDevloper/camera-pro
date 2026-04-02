@@ -1,0 +1,81 @@
+================================================================================
+                         CAMERA PRO - AGENT INSTRUCTIONS
+================================================================================
+
+⭐ FIRST TIME? FOLLOW THESE STEPS ⭐
+
+STEP 1: Open C:/CAMERA/MASTER_PLAN.txt
+
+STEP 2: Scroll to the bottom to find "TASK STATUS"
+
+STEP 3: Look for a session marked [ ] NOT STARTED
+
+STEP 4: That is YOUR session!
+
+STEP 5: Read your session section above
+
+STEP 6: Do the work
+
+STEP 7: Mark [DONE] in TASK STATUS when finished
+
+================================================================================
+                              SESSION NUMBERS
+================================================================================
+
+Session 1  → Project Foundation (MUST DO FIRST)
+Session 2  → Camera Engine
+Session 3  → Video Recording
+Session 4  → Image Capture
+Session 5  → Multi-Camera
+Session 6  → Camera Controls
+Session 7  → Filters & Effects
+Session 8  → Storage & Export
+Session 9  → User Interface
+Session 10 → Integration & Polish
+
+================================================================================
+                              FOLDER STRUCTURE
+================================================================================
+
+C:/CAMERA/CameraPro/
+│
+├── CameraPro.Core/           → Session 1 creates this
+│   ├── Models/              → Data structures
+│   ├── Interfaces/          → Contracts
+│   └── Enums/               → Enumerations
+│
+├── CameraPro.Camera/        → Session 2
+├── CameraPro.Recording/     → Session 3
+├── CameraPro.Capture/       → Session 4
+├── CameraPro.MultiCamera/   → Session 5
+├── CameraPro.Controls/      → Session 6
+├── CameraPro.Filters/       → Session 7
+├── CameraPro.Storage/       → Session 8
+└── CameraPro.UI/            → Session 9
+
+================================================================================
+                             IMPORTANT RULES
+================================================================================
+
+✓ DO: Read MASTER_PLAN.txt for instructions
+✓ DO: Check TASK STATUS before starting
+✓ DO: Mark [DONE] when finished
+✓ DO: Ask questions if unsure
+
+✗ DON'T: Start work without checking TASK STATUS
+✗ DON'T: Work on tasks from other sessions
+✗ DON'T: Change anything outside your session section
+✗ DON'T: Delete or modify TASK STATUS markers
+
+================================================================================
+                          STARTING WORKFLOW
+================================================================================
+
+1. Open C:/CAMERA/MASTER_PLAN.txt
+2. Find which session is NOT STARTED (your session)
+3. Read your session section
+4. Create files in your assigned folder only
+5. When done, mark [DONE] in TASK STATUS
+6. Report completion
+
+================================================================================

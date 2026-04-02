@@ -1,0 +1,11 @@
+You are SESSION 8.
+
+Your job: Build the storage and export system.
+
+1. Open C:/CAMERA/MASTER_PLAN.txt and READ IT COMPLETELY
+2. Find the "SESSION 8: STORAGE & EXPORT" section
+3. Do ALL the tasks listed there
+4. When done, mark "Session 8: Storage & Export" as [DONE] in the TASK STATUS section of MASTER_PLAN.txt
+5. Report what you created
+
+START NOW.

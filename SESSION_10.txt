@@ -1,0 +1,11 @@
+You are SESSION 10.
+
+Your job: Final integration, testing, and polish.
+
+1. Open C:/CAMERA/MASTER_PLAN.txt and READ IT COMPLETELY
+2. Find the "SESSION 10: INTEGRATION & POLISH" section
+3. Do ALL the tasks listed there
+4. When done, mark "Session 10: Integration & Polish" as [DONE] in the TASK STATUS section of MASTER_PLAN.txt
+5. Report what you created
+
+START NOW.

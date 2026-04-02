@@ -1,0 +1,37 @@
+# .NET
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# Build output
+publish/
+out/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
+logs/
+
+# NuGet
+*.nupkg
+packages/
+
+# Thumbnails
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CameraPro specific
+Session_Logs/
+*.tmp

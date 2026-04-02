@@ -1,0 +1,138 @@
+================================================================================
+                    SESSION 4: IMAGE CAPTURE FIXES
+================================================================================
+
+⚠️ Session 2 fixes must be complete first!
+
+ISSUES TO FIX:
+
+================================================================================
+ISSUE 1: VERIFY IPhotoCapture.cs
+================================================================================
+File: C:/CAMERA/CameraPro/src/CameraPro.Core/Interfaces/IPhotoCapture.cs
+
+```csharp
+namespace CameraPro.Core.Interfaces;
+
+public interface IPhotoCapture
+{
+    string CapturePhoto();
+    Task<string> CapturePhotoAsync(CancellationToken cancellationToken = default);
+    List<string> CaptureBurst(int count);
+    Task<List<string>> CaptureBurstAsync(int count, CancellationToken cancellationToken = default);
+    string CaptureWithDelay(int seconds);
+    Task<string> CaptureWithDelayAsync(int seconds, CancellationToken cancellationToken = default);
+    
+    event EventHandler<string>? PhotoCaptured;
+    event EventHandler<int>? BurstProgress;
+    event EventHandler<int>? TimerCountdown;
+    event EventHandler<string>? CaptureError;
+}
+```
+
+================================================================================
+ISSUE 2: VERIFY PhotoCapture.cs
+================================================================================
+File: C:/CAMERA/CameraPro/src/CameraPro.Capture/PhotoCapture.cs
+
+Key implementation points:
+- Constructor must accept ICameraManager (NOT CameraManager)
+- Burst mode must get FRESH frame in each iteration
+- Timer must use async/await (NOT Thread.Sleep)
+- Counter must persist by loading from existing files
+
+```csharp
+public class PhotoCapture : IPhotoCapture
+{
+    private readonly ICameraManager _cameraManager;  // IMPORTANT: Use interface!
+    private string _baseSavePath;
+    private int _photoCounter;
+    
+    public PhotoCapture(ICameraManager cameraManager)  // Interface in constructor
+    {
+        _cameraManager = cameraManager;
+        // ... rest of initialization
+        LoadCounterFromExistingFiles();
+    }
+    
+    // Burst mode - CRITICAL: Get fresh frame each time
+    public async Task<List<string>> CaptureBurstAsync(int count, CancellationToken cancellationToken = default)
+    {
+        var results = new List<string>();
+        for (int i = 0; i < count; i++)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+            
+            // CRITICAL: Get FRESH frame inside loop, not outside!
+            var frame = await Task.Run(() => _cameraManager.GetCurrentFrame(), cancellationToken);
+            if (frame == null) continue;
+            
+            var filePath = await GenerateFilePathAsync();
+            await SaveFrameAsync(frame, filePath, cancellationToken);
+            if (!string.IsNullOrEmpty(filePath)) results.Add(filePath);
+            
+            BurstProgress?.Invoke(this, i + 1);
+            
+            // Delay between bursts (100ms default)
+            if (i < count - 1)
+                await Task.Delay(_burstIntervalMs, cancellationToken);
+        }
+        return results;
+    }
+    
+    // Timer mode - use async
+    public async Task<string> CaptureWithDelayAsync(int seconds, CancellationToken cancellationToken = default)
+    {
+        for (int i = seconds; i > 0; i--)
+        {
+            if (cancellationToken.IsCancellationRequested) return string.Empty;
+            TimerCountdown?.Invoke(this, i);
+            await Task.Delay(1000, cancellationToken);  // NOT Thread.Sleep!
+        }
+        return await CapturePhotoAsync(cancellationToken);
+    }
+    
+    // Load counter from existing files
+    private void LoadCounterFromExistingFiles()
+    {
+        // Scan existing files and find highest counter
+        // Set _photoCounter = highest + 1
+    }
+}
+```
+
+================================================================================
+ISSUE 3: VERIFY SERVICE REGISTRATION
+================================================================================
+File: C:/CAMERA/CameraPro/CameraPro.App/ServiceConfiguration.cs
+
+```csharp
+services.AddSingleton<ICameraManager, CameraManager>();  // Register BEFORE PhotoCapture
+services.AddSingleton<IPhotoCapture, PhotoCapture>();    // PhotoCapture depends on ICameraManager
+```
+
+================================================================================
+ISSUE 4: DATE-BASED ORGANIZATION
+================================================================================
+Photos should be saved to:
+- C:/Users/[User]/Pictures/CameraPro/2026/04-April/
+
+```csharp
+private string GetSavePath()
+{
+    if (!_useDateOrganization) return _baseSavePath;
+    
+    var now = DateTime.Now;
+    return Path.Combine(_baseSavePath, now.Year.ToString(), $"{now.Month:D2}-{now:MMMM}");
+}
+```
+
+================================================================================
+DELIVERABLES:
+✅ Uses ICameraManager interface (not concrete class)
+✅ Burst captures different frames (fresh frame in loop)
+✅ Timer uses async/await (not blocking)
+✅ Counter loads from existing files
+✅ Date-based folder organization
+✅ All async methods with CancellationToken
+================================================================================

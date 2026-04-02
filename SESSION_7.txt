@@ -1,0 +1,11 @@
+You are SESSION 7.
+
+Your job: Build the filters and effects engine.
+
+1. Open C:/CAMERA/MASTER_PLAN.txt and READ IT COMPLETELY
+2. Find the "SESSION 7: FILTERS & EFFECTS" section
+3. Do ALL the tasks listed there
+4. When done, mark "Session 7: Filters & Effects" as [DONE] in the TASK STATUS section of MASTER_PLAN.txt
+5. Report what you created
+
+START NOW.

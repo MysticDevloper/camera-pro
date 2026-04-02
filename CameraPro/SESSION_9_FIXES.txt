@@ -1,0 +1,464 @@
+================================================================================
+                    SESSION 9: USER INTERFACE FIXES
+================================================================================
+
+⚠️ Session 1 fixes must be complete (UI framework conflict resolved)!
+
+ISSUES TO FIX:
+
+================================================================================
+ISSUE 1: VERIFY WPF PROJECT ONLY
+================================================================================
+Delete CameraPro.UI project completely if it still exists.
+
+Only CameraPro.App with WPF should exist.
+
+================================================================================
+ISSUE 2: App.xaml.cs - DEPENDENCY INJECTION
+================================================================================
+File: C:/CAMERA/CameraPro/CameraPro.App/App.xaml.cs
+
+```csharp
+using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace CameraPro.App;
+
+public partial class App : Application
+{
+    public static IServiceProvider Services { get; private set; } = null!;
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        // Configure services
+        Services = ServiceConfiguration.Configure();
+        
+        // Setup logging
+        CameraPro.Core.Infrastructure.LoggingSetup.Initialize();
+        
+        // Setup global exception handler
+        AppDomain.CurrentDomain.UnhandledException += 
+            CameraPro.Core.Infrastructure.GlobalExceptionHandler.Handle;
+        
+        base.OnStartup(e);
+        
+        // Show main window
+        var mainWindow = new MainWindow();
+        mainWindow.Show();
+    }
+}
+```
+
+================================================================================
+ISSUE 3: MainWindow.xaml.cs - INJECT SERVICES
+================================================================================
+File: C:/CAMERA/CameraPro/CameraPro.App/MainWindow.xaml.cs
+
+```csharp
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using CameraPro.Core.Interfaces;
+using CameraPro.Core.Models;
+using CameraPro.Capture;
+using CameraPro.Recording;
+using CameraPro.Controls;
+using CameraPro.Filters;
+using CameraPro.Storage;
+
+namespace CameraPro.App;
+
+public partial class MainWindow : Window
+{
+    private readonly ICameraManager _cameraManager;
+    private readonly IPhotoCapture _photoCapture;
+    private readonly IVideoRecorder _videoRecorder;
+    private readonly CameraControls _cameraControls;
+    private readonly FilterService _filterService;
+    private readonly IFileManager _fileManager;
+    private readonly IMediaLibrary _mediaLibrary;
+    private readonly CameraRecorderBridge _recorderBridge;
+    
+    private DispatcherTimer? _previewTimer;
+    private DispatcherTimer? _recordingTimer;
+    private DispatcherTimer? _countdownTimer;
+    private DateTime _recordingStartTime;
+    private TimeSpan _recordingDuration;
+    private bool _isRecording;
+    private bool _isPaused;
+    private bool _isFullscreen;
+    private double _zoomLevel = 1.0;
+    private int _countdownValue;
+    private bool _showGrid;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        
+        // Get services from DI
+        _cameraManager = App.Services.GetRequiredService<ICameraManager>();
+        _photoCapture = App.Services.GetRequiredService<IPhotoCapture>();
+        _videoRecorder = App.Services.GetRequiredService<IVideoRecorder>();
+        _cameraControls = App.Services.GetRequiredService<CameraControls>();
+        _filterService = App.Services.GetRequiredService<FilterService>();
+        _fileManager = App.Services.GetRequiredService<IFileManager>();
+        _mediaLibrary = App.Services.GetRequiredService<IMediaLibrary>();
+        _recorderBridge = App.Services.GetRequiredService<CameraRecorderBridge>();
+        
+        // Subscribe to camera events
+        _cameraManager.StatusChanged += OnCameraStatusChanged;
+        
+        // Initialize
+        InitializeCameraSelector();
+        InitializePreviewTimer();
+        UpdateStorageStatus();
+    }
+
+    private void OnCameraStatusChanged(object? sender, CameraStatus status)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            CameraStatusText.Text = status.ToString();
+        });
+    }
+
+    private void InitializeCameraSelector()
+    {
+        try
+        {
+            var cameras = _cameraManager.GetCameras();
+            CameraSelector.Items.Clear();
+            CameraSelector.Items.Add(new ComboBoxItem { Content = "Select Camera..." });
+            
+            foreach (var camera in cameras)
+            {
+                CameraSelector.Items.Add(new ComboBoxItem 
+                { 
+                    Content = camera.Name,
+                    Tag = camera.Id
+                });
+            }
+            
+            if (cameras.Count > 0)
+                CameraSelector.SelectedIndex = 1;
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Failed to initialize cameras");
+        }
+    }
+
+    private void InitializePreviewTimer()
+    {
+        _previewTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(33) // ~30fps
+        };
+        _previewTimer.Tick += PreviewTimer_Tick;
+    }
+
+    private void PreviewTimer_Tick(object? sender, EventArgs e)
+    {
+        try
+        {
+            var frame = _cameraManager.GetCurrentFrame();
+            if (frame != null)
+            {
+                // Apply filters if any active
+                BitmapSource displayFrame = frame;
+                if (_filterService.Pipeline.Filters.Any())
+                {
+                    displayFrame = _filterService.ProcessAndConvertToBitmapSource(frame) ?? frame;
+                }
+                
+                PreviewImage.Source = displayFrame;
+                PreviewStatusText.Text = "Preview Active";
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Error updating preview");
+        }
+    }
+}
+```
+
+================================================================================
+ISSUE 4: PHOTO CAPTURE INTEGRATION
+================================================================================
+```csharp
+private void PhotoButton_Click(object sender, RoutedEventArgs e)
+{
+    try
+    {
+        var timerIndex = QuickTimerSelector.SelectedIndex;
+        if (timerIndex > 0)
+        {
+            _countdownValue = timerIndex switch
+            {
+                1 => 3,
+                2 => 5,
+                3 => 10,
+                _ => 0
+            };
+            StartCountdown();
+        }
+        else
+        {
+            CapturePhoto();
+        }
+    }
+    catch (Exception ex)
+    {
+        Serilog.Log.Error(ex, "Failed to capture photo");
+    }
+}
+
+private async void CapturePhoto()
+{
+    try
+    {
+        var path = await _photoCapture.CapturePhotoAsync();
+        if (!string.IsNullOrEmpty(path))
+        {
+            ShowLastPhoto(path);
+            ShowToast($"Photo saved: {System.IO.Path.GetFileName(path)}");
+            UpdateStorageStatus();
+        }
+    }
+    catch (Exception ex)
+    {
+        Serilog.Log.Error(ex, "Failed to capture photo");
+        ShowToast("Failed to capture photo");
+    }
+}
+
+private async void StartCountdown()
+{
+    TimerOverlay.Visibility = Visibility.Visible;
+    TimerOverlay.Text = _countdownValue.ToString();
+    
+    _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+    _countdownTimer.Tick += async (s, args) =>
+    {
+        _countdownValue--;
+        if (_countdownValue > 0)
+        {
+            TimerOverlay.Text = _countdownValue.ToString();
+        }
+        else
+        {
+            _countdownTimer?.Stop();
+            TimerOverlay.Visibility = Visibility.Collapsed;
+            await _photoCapture.CapturePhotoAsync();
+        }
+    };
+    _countdownTimer.Start();
+}
+```
+
+================================================================================
+ISSUE 5: VIDEO RECORDING INTEGRATION
+================================================================================
+```csharp
+private async void RecordButton_Click(object sender, RoutedEventArgs e)
+{
+    if (!_isRecording)
+        await StartRecording();
+    else
+        StopRecording();
+}
+
+private async Task StartRecording()
+{
+    try
+    {
+        var settings = new CaptureSettings
+        {
+            Resolution = new Resolution { Width = 1920, Height = 1080 },
+            FrameRate = 30
+        };
+        
+        var outputPath = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+            "CameraPro",
+            DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".mp4");
+        
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(outputPath)!);
+        
+        await _recorderBridge.StartRecordingAsync(outputPath, settings);
+        
+        _isRecording = true;
+        _recordingStartTime = DateTime.Now;
+        _recordingDuration = TimeSpan.Zero;
+        
+        RecordDot.Fill = new SolidColorBrush(Colors.Red);
+        RecordingIndicator.Visibility = Visibility.Visible;
+        PauseButton.IsEnabled = true;
+        
+        _recordingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _recordingTimer.Tick += RecordingTimer_Tick;
+        _recordingTimer.Start();
+        
+        ShowToast("Recording started");
+    }
+    catch (Exception ex)
+    {
+        Serilog.Log.Error(ex, "Failed to start recording");
+        ShowToast("Failed to start recording");
+    }
+}
+
+private void StopRecording()
+{
+    try
+    {
+        _recordingTimer?.Stop();
+        var session = _recorderBridge.StopRecording();
+        
+        _isRecording = false;
+        _isPaused = false;
+        
+        RecordDot.Fill = new SolidColorBrush(Color.FromRgb(136, 136, 136));
+        RecordingIndicator.Visibility = Visibility.Collapsed;
+        PauseButton.IsEnabled = false;
+        
+        ShowToast($"Recording saved: {session.Duration:hh\\:mm\\:ss}");
+        UpdateStorageStatus();
+    }
+    catch (Exception ex)
+    {
+        Serilog.Log.Error(ex, "Failed to stop recording");
+    }
+}
+
+private void RecordingTimer_Tick(object? sender, EventArgs e)
+{
+    if (!_isPaused)
+    {
+        _recordingDuration = DateTime.Now - _recordingStartTime;
+        RecordingTimeText.Text = _recordingDuration.ToString(@"hh\:mm\:ss");
+    }
+}
+```
+
+================================================================================
+ISSUE 6: FILTER INTEGRATION
+================================================================================
+```csharp
+private void FilterButton_Click(object sender, RoutedEventArgs e)
+{
+    if (sender is Button button && button.Tag is string filterName)
+    {
+        var filterType = filterName switch
+        {
+            "Grayscale" => FilterType.Grayscale,
+            "Sepia" => FilterType.Sepia,
+            "Negative" => FilterType.Negative,
+            "Warm" => FilterType.Warm,
+            "Cool" => FilterType.Cool,
+            "Blur" => FilterType.Blur,
+            "Sharpen" => FilterType.Sharpen,
+            "Vignette" => FilterType.Vignette,
+            _ => FilterType.None
+        };
+        
+        if (filterType != FilterType.None)
+        {
+            _filterService.Pipeline.AddFilter(new ColorFilters 
+            { 
+                Type = filterType, 
+                IsEnabled = true 
+            });
+            UpdateFilterList();
+            ShowToast($"Filter added: {filterName}");
+        }
+    }
+}
+
+private void UpdateFilterList()
+{
+    ActiveFiltersList.Items.Clear();
+    ActiveFiltersList.Items.Add(new ListBoxItem { Content = "None", IsSelected = true });
+    
+    foreach (var filter in _filterService.Pipeline.Filters)
+    {
+        ActiveFiltersList.Items.Add(new ListBoxItem { Content = filter.Name });
+    }
+}
+```
+
+================================================================================
+ISSUE 7: CAMERA CONTROLS INTEGRATION
+================================================================================
+```csharp
+private void ExposureSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+{
+    _cameraControls.Exposure = e.NewValue;
+    ExposureValueText.Text = ((int)e.NewValue).ToString();
+}
+
+private void AutoExposure_Changed(object sender, RoutedEventArgs e)
+{
+    _cameraControls.IsAutoExposure = AutoExposureCheck.IsChecked ?? true;
+    ExposureSlider.IsEnabled = !(AutoExposureCheck.IsChecked ?? true);
+}
+
+private void AutoFocus_Changed(object sender, RoutedEventArgs e)
+{
+    _cameraControls.IsAutoFocus = AutoFocusCheck.IsChecked ?? true;
+    FocusSlider.IsEnabled = !(AutoFocusCheck.IsChecked ?? true);
+}
+
+private void FocusSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+{
+    _cameraControls.Focus = e.NewValue / 100.0;
+}
+```
+
+================================================================================
+ISSUE 8: KEYBOARD SHORTCUTS
+================================================================================
+Window_KeyDown should handle:
+- Space: Capture photo
+- R: Start/Stop recording
+- P: Pause recording (when recording)
+- F / F11: Toggle fullscreen
+- G: Toggle grid
+- 1-9: Quick filter selection
+- Escape: Exit fullscreen / close
+
+================================================================================
+ISSUE 9: CLEANUP ON CLOSE
+================================================================================
+```csharp
+protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+{
+    _previewTimer?.Stop();
+    _recordingTimer?.Stop();
+    _countdownTimer?.Stop();
+    
+    if (_isRecording)
+        StopRecording();
+    
+    _cameraManager.StopPreview();
+    
+    base.OnClosing(e);
+}
+```
+
+================================================================================
+DELIVERABLES:
+✅ All services injected via DI
+✅ Photo capture works with async
+✅ Video recording works with bridge
+✅ Filters apply to preview
+✅ Camera controls work
+✅ Keyboard shortcuts implemented
+✅ Proper cleanup on close
+✅ UI is fully functional
+================================================================================

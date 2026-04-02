@@ -1,0 +1,11 @@
+You are SESSION 3.
+
+Your job: Build the video recording system.
+
+1. Open C:/CAMERA/MASTER_PLAN.txt and READ IT COMPLETELY
+2. Find the "SESSION 3: VIDEO RECORDING" section
+3. Do ALL the tasks listed there
+4. When done, mark "Session 3: Video Recording" as [DONE] in the TASK STATUS section of MASTER_PLAN.txt
+5. Report what you created
+
+START NOW.

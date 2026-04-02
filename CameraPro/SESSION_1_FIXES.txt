@@ -1,0 +1,164 @@
+================================================================================
+                    SESSION 1: CRITICAL FIXES REQUIRED
+================================================================================
+
+⚠️ CRITICAL: This session must be fixed before any other session can work properly!
+
+ISSUES TO FIX:
+
+================================================================================
+ISSUE 1: UI FRAMEWORK CONFLICT
+================================================================================
+PROBLEM: 
+- CameraPro.App uses WPF (System.Windows.Window)
+- CameraPro.UI uses WinUI3 (Microsoft.WindowsAppSDK)
+
+SOLUTION:
+1. Delete the CameraPro.UI project entirely
+2. Keep only CameraPro.App with WPF
+3. All UI work should be in CameraPro.App
+
+ACTIONS:
+- Delete folder: C:/CAMERA/CameraPro/src/CameraPro.UI/
+- Delete file: C:/CAMERA/CameraPro/src/CameraPro.UI/CameraPro.UI.csproj
+- Remove from solution: CameraPro.UI project
+
+================================================================================
+ISSUE 2: MISSING DEPENDENCY INJECTION
+================================================================================
+PROBLEM:
+- No ServiceConfiguration.cs found
+- Services not registered
+- App.xaml.cs doesn't setup DI
+
+SOLUTION:
+Create C:/CAMERA/CameraPro/CameraPro.App/ServiceConfiguration.cs:
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using CameraPro.Core.Interfaces;
+using CameraPro.Camera;
+using CameraPro.Capture;
+using CameraPro.Recording;
+using CameraPro.Controls;
+using CameraPro.Filters;
+using CameraPro.Storage;
+
+namespace CameraPro.App;
+
+public static class ServiceConfiguration
+{
+    public static IServiceProvider Configure()
+    {
+        var services = new ServiceCollection();
+        
+        // Core Services
+        services.AddSingleton<ICameraManager, CameraManager>();
+        services.AddSingleton<IPhotoCapture, PhotoCapture>();
+        services.AddSingleton<IVideoRecorder, VideoRecorder>();
+        services.AddSingleton<CameraControls>();
+        services.AddSingleton<FilterService>();
+        
+        // Storage Services
+        services.AddSingleton<IFileManager, FileManager>();
+        services.AddSingleton<IMediaLibrary, MediaLibrary>();
+        services.AddSingleton<IStorageStatistics, StorageStatistics>();
+        
+        return services.BuildServiceProvider();
+    }
+}
+```
+
+Then update C:/CAMERA/CameraPro/CameraPro.App/App.xaml.cs:
+
+```csharp
+using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace CameraPro.App;
+
+public partial class App : Application
+{
+    public static IServiceProvider Services { get; private set; } = null!;
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        Services = ServiceConfiguration.Configure();
+        
+        // Setup logging
+        CameraPro.Core.Infrastructure.LoggingSetup.Initialize();
+        
+        // Setup global exception handler
+        AppDomain.CurrentDomain.UnhandledException += GlobalExceptionHandler.Handle;
+        
+        base.OnStartup(e);
+    }
+}
+```
+
+================================================================================
+ISSUE 3: MISSING USING STATEMENTS IN App.xaml.cs
+================================================================================
+Make sure App.xaml.cs has:
+```csharp
+using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
+```
+
+================================================================================
+ISSUE 4: VERIFY PROJECT REFERENCES
+================================================================================
+C:/CAMERA/CameraPro/CameraPro.App/CameraPro.App.csproj should have:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\CameraPro.Core\CameraPro.Core.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Camera\CameraPro.Camera.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Capture\CameraPro.Capture.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Recording\CameraPro.Recording.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Controls\CameraPro.Controls.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Filters\CameraPro.Filters.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Storage\CameraPro.Storage.csproj" />
+  </ItemGroup>
+
+</Project>
+```
+
+================================================================================
+ISSUE 5: VERIFY NO DUPLICATE FILES IN CORE
+================================================================================
+Check and delete duplicates:
+- C:/CAMERA/CameraPro/src/CameraPro.Core/AppConfig.cs (delete if Infrastructure/AppConfig.cs exists)
+- C:/CAMERA/CameraPro/src/CameraPro.Core/GlobalExceptionHandler.cs (delete if Infrastructure/ exists)
+- C:/CAMERA/CameraPro/src/CameraPro.Core/LoggingSetup.cs (delete if Infrastructure/ exists)
+
+Keep files ONLY in Infrastructure/ folder:
+- Infrastructure/AppConfig.cs
+- Infrastructure/GlobalExceptionHandler.cs
+- Infrastructure/LoggingSetup.cs
+
+================================================================================
+DELIVERABLES:
+✅ CameraPro.UI project deleted
+✅ ServiceConfiguration.cs created
+✅ App.xaml.cs updated with DI
+✅ All duplicate files removed
+✅ Solution builds without errors
+================================================================================

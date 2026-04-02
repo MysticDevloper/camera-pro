@@ -1,0 +1,11 @@
+You are SESSION 5.
+
+Your job: Build the multi-camera support system.
+
+1. Open C:/CAMERA/MASTER_PLAN.txt and READ IT COMPLETELY
+2. Find the "SESSION 5: MULTI-CAMERA" section
+3. Do ALL the tasks listed there
+4. When done, mark "Session 5: Multi-Camera" as [DONE] in the TASK STATUS section of MASTER_PLAN.txt
+5. Report what you created
+
+START NOW.

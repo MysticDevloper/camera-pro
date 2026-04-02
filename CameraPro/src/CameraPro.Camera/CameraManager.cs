@@ -1,0 +1,212 @@
+using System.Windows.Media.Imaging;
+using CameraPro.Core.Enums;
+using CameraPro.Core.Interfaces;
+using CameraPro.Core.Models;
+using Serilog;
+using Windows.Devices.Enumeration;
+using Windows.Graphics.Imaging;
+using Windows.Media.Capture;
+using Windows.Media.Capture.Frames;
+using Windows.Storage.Streams;
+
+namespace CameraPro.Camera;
+
+public class CameraManager : ICameraManager, IDisposable
+{
+    private MediaCapture? _mediaCapture;
+    private MediaFrameReader? _frameReader;
+    private string? _currentCameraId;
+    private CaptureSettings _currentSettings = new();
+    private BitmapSource? _latestFrame;
+    private bool _isPreviewRunning;
+    private CancellationTokenSource? _previewCts;
+    private CameraStatus _status = CameraStatus.Disconnected;
+    private DeviceWatcher? _deviceWatcher;
+    private readonly DeviceEnumerator _deviceEnumerator;
+
+    public event EventHandler<CameraStatus>? StatusChanged;
+    public event EventHandler<BitmapSource>? FrameAvailable;
+    public event EventHandler<string>? ErrorOccurred;
+    public event EventHandler? CameraDisconnected;
+    public event EventHandler<CameraDevice>? CameraAdded;
+    public event EventHandler<string>? CameraRemoved;
+
+    public CameraStatus Status
+    {
+        get => _status;
+        private set
+        {
+            if (_status != value)
+            {
+                _status = value;
+                StatusChanged?.Invoke(this, value);
+            }
+        }
+    }
+
+    public CameraManager()
+    {
+        _deviceEnumerator = new DeviceEnumerator();
+        SetupDeviceWatcher();
+    }
+
+    private void SetupDeviceWatcher()
+    {
+        _deviceWatcher = DeviceInformation.CreateWatcher(DeviceClass.VideoCapture);
+        _deviceWatcher.Added += (s, e) => CameraAdded?.Invoke(this, new CameraDevice { Id = e.Id, Name = e.Name });
+        _deviceWatcher.Removed += (s, e) => CameraRemoved?.Invoke(this, e.Id);
+        _deviceWatcher.Start();
+    }
+
+    public List<CameraDevice> GetCameras()
+    {
+        try
+        {
+            var task = _deviceEnumerator.GetAllCamerasAsync();
+            task.Wait();
+            return task.Result;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to get cameras");
+            return new List<CameraDevice>();
+        }
+    }
+
+    public async void StartPreview(string cameraId)
+    {
+        if (string.IsNullOrEmpty(cameraId))
+        {
+            Status = CameraStatus.Error;
+            ErrorOccurred?.Invoke(this, "No camera selected");
+            return;
+        }
+
+        try
+        {
+            StopPreview();
+            Status = CameraStatus.Connecting;
+
+            _mediaCapture = new MediaCapture();
+            var settings = new MediaCaptureInitializationSettings
+            {
+                VideoDeviceId = cameraId,
+                StreamingCaptureMode = StreamingCaptureMode.Video
+            };
+
+            await _mediaCapture.InitializeAsync(settings);
+            _currentCameraId = cameraId;
+
+            var frameSource = await _mediaCapture.CreateFrameSourceAsync(MediaFrameSourceKind.Color);
+            _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource);
+            _frameReader.FrameArrived += OnFrameArrived;
+            await _frameReader.StartAsync();
+
+            _isPreviewRunning = true;
+            Status = CameraStatus.Connected;
+            Log.Information("Preview started for camera: {CameraId}", cameraId);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Status = CameraStatus.Error;
+            ErrorOccurred?.Invoke(this, "Camera access denied. Grant permission in Windows Settings.");
+        }
+        catch (IOException)
+        {
+            Status = CameraStatus.Error;
+            ErrorOccurred?.Invoke(this, "Camera is in use by another application.");
+        }
+        catch (Exception ex)
+        {
+            Status = CameraStatus.Error;
+            ErrorOccurred?.Invoke(this, $"Failed to start camera: {ex.Message}");
+            Log.Error(ex, "Failed to start preview");
+        }
+    }
+
+    private void OnFrameArrived(MediaFrameReader sender, FrameArrivedEventArgs args)
+    {
+        try
+        {
+            using var frame = sender.TryAcquireLatestFrame();
+            if (frame == null) return;
+
+            var softwareBitmap = frame.VideoMediaFrame.GetSoftwareBitmap();
+            if (softwareBitmap == null) return;
+
+            var bitmap = ConvertToBitmapSource(softwareBitmap);
+            if (bitmap != null)
+            {
+                _latestFrame = bitmap;
+                FrameAvailable?.Invoke(this, bitmap);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Error processing frame");
+        }
+    }
+
+    private BitmapSource? ConvertToBitmapSource(SoftwareBitmap softwareBitmap)
+    {
+        try
+        {
+            var bitmap = new WriteableBitmap(
+                softwareBitmap.PixelWidth,
+                softwareBitmap.PixelHeight,
+                96, 96,
+                PixelFormats.Bgra32,
+                null);
+
+            softwareBitmap.CopyToBuffer(bitmap.PixelBuffer);
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to convert SoftwareBitmap");
+            return null;
+        }
+    }
+
+    public void StopPreview()
+    {
+        _previewCts?.Cancel();
+        _previewCts?.Dispose();
+        _previewCts = null;
+
+        if (_frameReader != null)
+        {
+            try { _frameReader.StopAsync().Wait(1000); } catch { }
+            _frameReader.FrameArrived -= OnFrameArrived;
+            _frameReader.Dispose();
+            _frameReader = null;
+        }
+
+        if (_mediaCapture != null)
+        {
+            try { _mediaCapture.Dispose(); } catch { }
+            _mediaCapture = null;
+        }
+
+        _isPreviewRunning = false;
+        _currentCameraId = null;
+        Status = CameraStatus.Disconnected;
+    }
+
+    public BitmapSource? GetCurrentFrame() => _latestFrame;
+
+    public void SetFormat(CaptureSettings settings)
+    {
+        _currentSettings = settings;
+        Log.Information("Format set: {Width}x{Height} @ {Fps}fps", 
+            settings.Resolution.Width, settings.Resolution.Height, settings.FrameRate);
+    }
+
+    public void Dispose()
+    {
+        StopPreview();
+        _deviceWatcher?.Stop();
+        _deviceWatcher?.Dispose();
+    }
+}

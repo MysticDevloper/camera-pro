@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationId>CameraPro.App</ApplicationId>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    
+    <!-- Publish Settings -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    
+    <!-- App Info -->
+    <AssemblyName>CameraPro</AssemblyName>
+    <Version>1.0.0</Version>
+    <Product>Camera Pro</Product>
+    <Company>CameraPro</Company>
+    <Description>Advanced Windows Camera Application</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\CameraPro.Core\CameraPro.Core.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Camera\CameraPro.Camera.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Recording\CameraPro.Recording.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Capture\CameraPro.Capture.csproj" />
+    <ProjectReference Include="..\src\CameraPro.MultiCamera\CameraPro.MultiCamera.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Controls\CameraPro.Controls.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Filters\CameraPro.Filters.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Storage\CameraPro.Storage.csproj" />
+  </ItemGroup>
+
+</Project>

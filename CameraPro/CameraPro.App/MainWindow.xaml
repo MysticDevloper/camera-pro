@@ -1,0 +1,364 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+          xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+          Title="Camera Pro"
+          Width="1280"
+          Height="720"
+          WindowStartupLocation="CenterScreen"
+          KeyDown="Window_KeyDown"
+          Closing="Window_Closing">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="AccentBrush" Color="#0078D4"/>
+        <SolidColorBrush x:Key="DarkBrush" Color="#1E1E1E"/>
+        <SolidColorBrush x:Key="RecordingBrush" Color="#FF0000"/>
+        
+        <Style x:Key="PanelStyle" TargetType="Border">
+            <Setter Property="Background" Value="#2D2D30"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="Margin" Value="4"/>
+        </Style>
+        
+        <Style x:Key="ButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#3E3E42"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="4"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="#1E1E1E">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Menu Bar -->
+        <Menu Grid.Row="0" Background="#252526">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New Session" Click="NewSession_Click"/>
+                <MenuItem Header="_Open..." Click="Open_Click"/>
+                <MenuItem Header="_Save" Click="Save_Click"/>
+                <MenuItem Header="E_xit" Click="Exit_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Preferences..." Click="Preferences_Click"/>
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="_Fullscreen" Click="Fullscreen_Click" InputGestureText="F11"/>
+                <MenuItem Header="_Grid Toggle" Click="GridToggle_Click" InputGestureText="G"/>
+                <MenuItem Header="_Multi-Camera Layout">
+                    <MenuItem Header="_Single" Click="LayoutSingle_Click"/>
+                    <MenuItem Header="2x2 _Grid" Click="Layout2x2_Click"/>
+                    <MenuItem Header="_Picture in Picture" Click="LayoutPip_Click"/>
+                </MenuItem>
+            </MenuItem>
+            <MenuItem Header="_Camera">
+                <MenuItem Header="_Refresh Cameras" Click="RefreshCameras_Click"/>
+                <MenuItem Header="_Start Preview" Click="StartPreview_Click"/>
+                <MenuItem Header="S_top Preview" Click="StopPreview_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_Settings" Click="Settings_Click"/>
+                <MenuItem Header="_Storage" Click="Storage_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About Camera Pro" Click="About_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="1" Background="#2D2D30" Padding="8">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Camera:" Style="{StaticResource LabelStyle}"/>
+                <ComboBox x:Name="CameraSelector" Width="200" Margin="4" SelectionChanged="CameraSelector_SelectionChanged">
+                    <ComboBoxItem Content="Select Camera..." IsSelected="True"/>
+                </ComboBox>
+                
+                <TextBlock Text="Resolution:" Style="{StaticResource LabelStyle}"/>
+                <ComboBox x:Name="ResolutionSelector" Width="120" Margin="4" SelectionChanged="ResolutionSelector_SelectionChanged">
+                    <ComboBoxItem Content="4K (3840x2160)"/>
+                    <ComboBoxItem Content="1080p (1920x1080)" IsSelected="True"/>
+                    <ComboBoxItem Content="720p (1280x720)"/>
+                </ComboBox>
+                
+                <TextBlock Text="FPS:" Style="{StaticResource LabelStyle}"/>
+                <ComboBox x:Name="FpsSelector" Width="80" Margin="4" SelectionChanged="FpsSelector_SelectionChanged">
+                    <ComboBoxItem Content="60"/>
+                    <ComboBoxItem Content="30" IsSelected="True"/>
+                    <ComboBoxItem Content="15"/>
+                </ComboBox>
+                
+                <Separator Margin="8,0"/>
+                
+                <Button x:Name="FiltersButton" Content="Filters" Style="{StaticResource ButtonStyle}" Click="Filters_Click" Margin="4"/>
+                <Button x:Name="ControlsButton" Content="Controls" Style="{StaticResource ButtonStyle}" Click="Controls_Click" Margin="4"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Preview Area -->
+            <Border Grid.Column="0" Margin="8" Background="#000000" BorderBrush="#3E3E42" BorderThickness="1">
+                <Grid x:Name="PreviewContainer">
+                    <Viewbox x:Name="PreviewViewbox" Stretch="Uniform">
+                        <Image x:Name="PreviewImage" RenderOptions.BitmapScalingMode="LowQuality"/>
+                    </Viewbox>
+                    
+                    <TextBlock x:Name="TimerOverlay" 
+                               FontSize="72" 
+                               Foreground="White" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               Visibility="Collapsed"/>
+                    
+                    <StackPanel x:Name="RecordingIndicator" 
+                                Orientation="Horizontal" 
+                                HorizontalAlignment="Left" 
+                                VerticalAlignment="Top"
+                                Margin="16"
+                                Visibility="Collapsed">
+                        <Ellipse Width="16" Height="16" Fill="{StaticResource RecordingBrush}"/>
+                        <TextBlock x:Name="RecordingTimeText" Text="00:00:00" Foreground="White" FontSize="18" Margin="8,0"/>
+                        <TextBlock x:Name="FileSizeText" Text="0 MB" Foreground="#AAAAAA" FontSize="14" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <Border x:Name="LastPhotoThumbnail" 
+                            Width="120" Height="90" 
+                            HorizontalAlignment="Right" 
+                            VerticalAlignment="Bottom"
+                            Margin="16"
+                            Background="#1E1E1E" 
+                            BorderBrush="#3E3E42" 
+                            BorderThickness="1"
+                            Visibility="Collapsed">
+                        <Image x:Name="LastPhotoImage" Stretch="Uniform"/>
+                    </Border>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="16">
+                        <Button Content="-" Width="32" Click="ZoomOut_Click" Background="#3E3E42" Foreground="White"/>
+                        <TextBlock x:Name="ZoomLevelText" Text="100%" Foreground="White" VerticalAlignment="Center" Margin="8,0"/>
+                        <Button Content="+" Width="32" Click="ZoomIn_Click" Background="#3E3E42" Foreground="White"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Side Panel -->
+            <Border Grid.Column="1" Width="280" Style="{StaticResource PanelStyle}" x:Name="SidePanel">
+                <ScrollViewer>
+                    <StackPanel>
+                        <!-- Camera Controls Panel -->
+                        <Expander Header="Camera Controls" IsExpanded="True">
+                            <StackPanel Margin="8">
+                                <TextBlock Text="Exposure" Foreground="White" Margin="0,8,0,4"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="AutoExposureCheck" Content="Auto" Checked="AutoExposure_Changed" Unchecked="AutoExposure_Changed"/>
+                                    <Slider x:Name="ExposureSlider" Minimum="-100" Maximum="100" Value="0" Width="150" Margin="8,0" ValueChanged="ExposureSlider_ValueChanged"/>
+                                    <TextBlock x:Name="ExposureValueText" Text="0" Foreground="White" Width="30"/>
+                                </StackPanel>
+                                
+                                <TextBlock Text="Focus" Foreground="White" Margin="0,8,0,4"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="AutoFocusCheck" Content="Auto" IsChecked="True" Checked="AutoFocus_Changed" Unchecked="AutoFocus_Changed"/>
+                                    <Slider x:Name="FocusSlider" Minimum="0" Maximum="100" Value="50" Width="150" Margin="8,0" ValueChanged="FocusSlider_ValueChanged"/>
+                                </StackPanel>
+                                
+                                <TextBlock Text="White Balance" Foreground="White" Margin="0,8,0,4"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="AutoWBCheck" Content="Auto" IsChecked="True" Checked="AutoWB_Changed" Unchecked="AutoWB_Changed"/>
+                                    <ComboBox x:Name="WBPresetSelector" Width="100" Margin="8,0" SelectionChanged="WBPreset_SelectionChanged">
+                                        <ComboBoxItem Content="Auto" IsSelected="True"/>
+                                        <ComboBoxItem Content="Daylight"/>
+                                        <ComboBoxItem Content="Cloudy"/>
+                                        <ComboBoxItem Content="Tungsten"/>
+                                        <ComboBoxItem Content="Fluorescent"/>
+                                        <ComboBoxItem Content="Custom"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                
+                                <TextBlock Text="Brightness" Foreground="White" Margin="0,8,0,4"/>
+                                <Slider x:Name="BrightnessSlider" Minimum="-100" Maximum="100" Value="0" ValueChanged="BrightnessSlider_ValueChanged"/>
+                                
+                                <TextBlock Text="Contrast" Foreground="White" Margin="0,8,0,4"/>
+                                <Slider x:Name="ContrastSlider" Minimum="-100" Maximum="100" Value="0" ValueChanged="ContrastSlider_ValueChanged"/>
+                                
+                                <TextBlock Text="Saturation" Foreground="White" Margin="0,8,0,4"/>
+                                <Slider x:Name="SaturationSlider" Minimum="-100" Maximum="100" Value="0" ValueChanged="SaturationSlider_ValueChanged"/>
+                                
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <Button Content="Save Preset" Style="{StaticResource ButtonStyle}" Click="SavePreset_Click" Margin="4"/>
+                                    <Button Content="Load Preset" Style="{StaticResource ButtonStyle}" Click="LoadPreset_Click" Margin="4"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Filters Panel -->
+                        <Expander Header="Filters" IsExpanded="False">
+                            <StackPanel Margin="8">
+                                <TextBlock Text="Filter Intensity" Foreground="White" Margin="0,0,0,4"/>
+                                <Slider x:Name="FilterIntensitySlider" Minimum="0" Maximum="100" Value="100"/>
+                                
+                                <TextBlock Text="Active Filters" Foreground="White" Margin="0,8,0,4"/>
+                                <ListBox x:Name="ActiveFiltersList" Height="100" Background="#3E3E42" Foreground="White">
+                                    <ListBoxItem Content="None" IsSelected="True"/>
+                                </ListBox>
+                                
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button Content="Add Filter" Style="{StaticResource ButtonStyle}" Click="AddFilter_Click" Margin="4"/>
+                                    <Button Content="Remove" Style="{StaticResource ButtonStyle}" Click="RemoveFilter_Click" Margin="4"/>
+                                </StackPanel>
+                                
+                                <TextBlock Text="Available Filters" Foreground="White" Margin="0,8,0,4"/>
+                                <WrapPanel>
+                                    <Button Content="Grayscale" Style="{StaticResource ButtonStyle}" Margin="2" Tag="Grayscale" Click="FilterButton_Click"/>
+                                    <Button Content="Sepia" Style="{StaticResource ButtonStyle}" Margin="2" Tag="Sepia" Click="FilterButton_Click"/>
+                                    <Button Content="Negative" Style="{StaticResource ButtonStyle}" Margin="2" Tag="Negative" Click="FilterButton_Click"/>
+                                    <Button Content="Warm" Style="{StaticResource ButtonStyle}" Margin="2" Tag="Warm" Click="FilterButton_Click"/>
+                                    <Button Content="Cool" Style="{StaticResource ButtonStyle}" Margin="2" Tag="Cool" Click="FilterButton_Click"/>
+                                    <Button Content="Blur" Style="{StaticResource ButtonStyle}" Margin="2" Tag="Blur" Click="FilterButton_Click"/>
+                                    <Button Content="Sharpen" Style="{StaticResource ButtonStyle}" Margin="2" Tag="Sharpen" Click="FilterButton_Click"/>
+                                    <Button Content="Vignette" Style="{StaticResource ButtonStyle}" Margin="2" Tag="Vignette" Click="FilterButton_Click"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Multi-Camera Panel -->
+                        <Expander Header="Multi-Camera" IsExpanded="False">
+                            <StackPanel Margin="8">
+                                <TextBlock Text="Layout Mode" Foreground="White" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="LayoutModeSelector" SelectionChanged="LayoutMode_SelectionChanged">
+                                    <ComboBoxItem Content="Single Camera" IsSelected="True"/>
+                                    <ComboBoxItem Content="2x2 Grid"/>
+                                    <ComboBoxItem Content="3x3 Grid"/>
+                                    <ComboBoxItem Content="Picture in Picture"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="PiP Position" Foreground="White" Margin="0,8,0,4" x:Name="PipPositionLabel" Visibility="Collapsed"/>
+                                <ComboBox x:Name="PipPositionSelector" Visibility="Collapsed" SelectionChanged="PipPosition_SelectionChanged">
+                                    <ComboBoxItem Content="Top Left" IsSelected="True"/>
+                                    <ComboBoxItem Content="Top Right"/>
+                                    <ComboBoxItem Content="Bottom Left"/>
+                                    <ComboBoxItem Content="Bottom Right"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="PiP Size" Foreground="White" Margin="0,8,0,4" x:Name="PipSizeLabel" Visibility="Collapsed"/>
+                                <Slider x:Name="PipSizeSlider" Minimum="10" Maximum="40" Value="20" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Capture Settings Panel -->
+                        <Expander Header="Capture Settings" IsExpanded="False">
+                            <StackPanel Margin="8">
+                                <TextBlock Text="Photo Format" Foreground="White" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="PhotoFormatSelector">
+                                    <ComboBoxItem Content="JPEG" IsSelected="True"/>
+                                    <ComboBoxItem Content="PNG"/>
+                                    <ComboBoxItem Content="BMP"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="JPEG Quality" Foreground="White" Margin="0,8,0,4"/>
+                                <Slider x:Name="JpegQualitySlider" Minimum="1" Maximum="100" Value="90"/>
+                                
+                                <TextBlock Text="Timer Mode" Foreground="White" Margin="0,8,0,4"/>
+                                <ComboBox x:Name="TimerModeSelector">
+                                    <ComboBoxItem Content="Off" IsSelected="True"/>
+                                    <ComboBoxItem Content="3 seconds"/>
+                                    <ComboBoxItem Content="5 seconds"/>
+                                    <ComboBoxItem Content="10 seconds"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="Burst Mode" Foreground="White" Margin="0,8,0,4"/>
+                                <ComboBox x:Name="BurstModeSelector">
+                                    <ComboBoxItem Content="Single" IsSelected="True"/>
+                                    <ComboBoxItem Content="3 Photos"/>
+                                    <ComboBoxItem Content="5 Photos"/>
+                                    <ComboBoxItem Content="10 Photos"/>
+                                    <ComboBoxItem Content="Continuous"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- Bottom Capture Bar -->
+        <Border Grid.Row="3" Background="#2D2D30" Padding="16,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Photo Controls -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button x:Name="PhotoButton" Width="60" Height="60" Click="PhotoButton_Click" Background="#0078D4" BorderThickness="0">
+                        <Grid Width="40" Height="40">
+                            <Ellipse Width="40" Height="40" Fill="White"/>
+                            <Ellipse Width="32" Height="32" Fill="#0078D4"/>
+                        </Grid>
+                    </Button>
+                    
+                    <ComboBox x:Name="QuickTimerSelector" Width="100" Margin="8,0" VerticalAlignment="Center">
+                        <ComboBoxItem Content="Timer: Off" IsSelected="True"/>
+                        <ComboBoxItem Content="Timer: 3s"/>
+                        <ComboBoxItem Content="Timer: 5s"/>
+                        <ComboBoxItem Content="Timer: 10s"/>
+                    </ComboBox>
+                    
+                    <Button x:Name="BurstButton" Content="Burst" Style="{StaticResource ButtonStyle}" Click="BurstButton_Click" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Recording Controls -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="RecordButton" Width="60" Height="60" Click="RecordButton_Click" Background="#3E3E42" BorderThickness="0" VerticalAlignment="Center">
+                        <Ellipse x:Name="RecordDot" Width="30" Height="30" Fill="#888888"/>
+                    </Button>
+                    
+                    <Button x:Name="PauseButton" Content="Pause" Style="{StaticResource ButtonStyle}" Click="PauseButton_Click" Margin="8,0" IsEnabled="False" VerticalAlignment="Center"/>
+                    
+                    <TextBlock x:Name="RecordingStatusText" Text="" Foreground="White" VerticalAlignment="Center" Margin="8,0"/>
+                </StackPanel>
+
+                <!-- Right Controls -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="Grid" Style="{StaticResource ButtonStyle}" Click="GridToggle_Click" Margin="4"/>
+                    <Button Content="Fullscreen" Style="{StaticResource ButtonStyle}" Click="Fullscreen_Click" Margin="4"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="4" Background="#007ACC" Padding="8,4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="CameraStatusText" Grid.Column="0" Text="Ready" Foreground="White"/>
+                <TextBlock x:Name="PreviewStatusText" Grid.Column="2" Text="No Preview" Foreground="White" Margin="16,0"/>
+                <TextBlock x:Name="ResolutionStatusText" Grid.Column="3" Text="1920x1080 @ 30fps" Foreground="White" Margin="16,0"/>
+                <TextBlock x:Name="StorageStatusText" Grid.Column="4" Text="Free: -- GB" Foreground="White" Margin="16,0,0,0"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

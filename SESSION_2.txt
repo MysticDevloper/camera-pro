@@ -1,0 +1,11 @@
+You are SESSION 2.
+
+Your job: Build the camera engine.
+
+1. Open C:/CAMERA/MASTER_PLAN.txt and READ IT COMPLETELY
+2. Find the "SESSION 2: CAMERA ENGINE" section
+3. Do ALL the tasks listed there
+4. When done, mark "Session 2: Camera Engine" as [DONE] in the TASK STATUS section of MASTER_PLAN.txt
+5. Report what you created
+
+START NOW.

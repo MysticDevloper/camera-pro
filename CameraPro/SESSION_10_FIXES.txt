@@ -1,0 +1,183 @@
+================================================================================
+                    SESSION 10: INTEGRATION & TESTING
+================================================================================
+
+⚠️ ALL OTHER SESSIONS MUST BE FIXED FIRST!
+
+FINAL CHECKLIST:
+
+================================================================================
+STEP 1: VERIFY PROJECT STRUCTURE
+================================================================================
+
+```
+C:/CAMERA/CameraPro/
+├── CameraPro.sln
+├── CameraPro.App/
+│   ├── CameraPro.App.csproj
+│   ├── App.xaml
+│   ├── App.xaml.cs
+│   ├── MainWindow.xaml
+│   ├── MainWindow.xaml.cs
+│   └── ServiceConfiguration.cs
+└── src/
+    ├── CameraPro.Core/
+    │   ├── CameraPro.Core.csproj
+    │   ├── Models/
+    │   ├── Interfaces/
+    │   ├── Enums/
+    │   └── Infrastructure/
+    ├── CameraPro.Camera/
+    ├── CameraPro.Capture/
+    ├── CameraPro.Recording/
+    ├── CameraPro.MultiCamera/
+    ├── CameraPro.Controls/
+    ├── CameraPro.Filters/
+    └── CameraPro.Storage/
+```
+
+DELETE IF EXISTS:
+- CameraPro.UI/ folder (WinUI3 conflict)
+
+================================================================================
+STEP 2: VERIFY ALL .csproj FILES
+================================================================================
+
+CameraPro.App.csproj MUST have:
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\CameraPro.Core\CameraPro.Core.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Camera\CameraPro.Camera.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Capture\CameraPro.Capture.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Recording\CameraPro.Recording.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Controls\CameraPro.Controls.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Filters\CameraPro.Filters.csproj" />
+    <ProjectReference Include="..\src\CameraPro.Storage\CameraPro.Storage.csproj" />
+  </ItemGroup>
+
+</Project>
+```
+
+CameraPro.Filters.csproj MUST have:
+```xml
+<ItemGroup>
+  <PackageReference Include="OpenCvSharp4.Windows" Version="4.9.0.20240103" />
+  <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
+</ItemGroup>
+```
+
+================================================================================
+STEP 3: BUILD THE SOLUTION
+================================================================================
+
+Open Command Prompt in C:/CAMERA/CameraPro and run:
+
+```batch
+dotnet restore
+dotnet build
+```
+
+FIX ANY BUILD ERRORS before continuing.
+
+================================================================================
+STEP 4: TEST FEATURES
+================================================================================
+
+After successful build, test each feature:
+
+□ Camera enumeration - cameras listed
+□ Preview - live feed displays
+□ Photo capture - saves to Pictures/CameraPro
+□ Video recording - creates MP4 file
+□ Filters - apply to preview
+□ Camera controls - sliders work
+□ Storage - files organized by date
+
+================================================================================
+STEP 5: PUBLISH THE APPLICATION
+================================================================================
+
+Run in Command Prompt:
+
+```batch
+dotnet publish CameraPro.App\CameraPro.App.csproj -c Release -r win-x64 --self-contained -o publish
+```
+
+This creates:
+- C:/CAMERA/CameraPro/publish/CameraPro.exe
+
+================================================================================
+STEP 6: VERIFY EXE EXISTS
+================================================================================
+
+Check that CameraPro.exe exists in the publish folder.
+
+Test running the .exe directly.
+
+================================================================================
+STEP 7: CREATE README
+================================================================================
+
+Create C:/CAMERA/CameraPro/README.md:
+
+```markdown
+# Camera Pro
+
+Advanced Windows Camera Application
+
+## Features
+- Live camera preview
+- Photo capture (JPEG, PNG, BMP)
+- Video recording (MP4)
+- Real-time filters
+- Camera controls (exposure, focus, white balance)
+- Multi-camera support
+- Storage organization
+
+## Requirements
+- Windows 10 (version 1903 or later)
+- .NET 8 Runtime (included in self-contained build)
+
+## Installation
+1. Run CameraPro.exe from the publish folder
+
+## Usage
+- Space: Capture photo
+- R: Start/stop recording
+- P: Pause recording
+- F11: Fullscreen
+- G: Toggle grid
+- 1-9: Quick filters
+
+## Storage
+Photos: C:\Users\[User]\Pictures\CameraPro
+Videos: C:\Users\[User]\Videos\CameraPro
+```
+
+================================================================================
+DELIVERABLES:
+✅ Project structure correct
+✅ No WinUI/WPF conflict
+✅ Solution builds without errors
+✅ All features integrated
+✅ .exe published successfully
+✅ README created
+✅ Application ready to test
+================================================================================

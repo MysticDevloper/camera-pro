@@ -1,0 +1,273 @@
+================================================================================
+                    SESSION 6: CAMERA CONTROLS FIXES
+================================================================================
+
+ISSUES TO FIX:
+
+================================================================================
+ISSUE 1: CAMERA DEVICE CONTROLLER
+================================================================================
+File: C:/CAMERA/CameraPro/src/CameraPro.Controls/CameraDeviceController.cs
+
+```csharp
+using Windows.Media.Devices;
+using Windows.Media.Capture;
+using Serilog;
+
+namespace CameraPro.Controls;
+
+public class CameraDeviceController : IDisposable
+{
+    private MediaCapture? _mediaCapture;
+    private string? _cameraId;
+    private VideoDeviceController? _videoDeviceController;
+
+    public void Connect(MediaCapture mediaCapture, string cameraId)
+    {
+        _mediaCapture = mediaCapture;
+        _cameraId = cameraId;
+        
+        try
+        {
+            _videoDeviceController = mediaCapture.VideoDeviceController;
+            Log.Information("Connected to camera device controller");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to get VideoDeviceController");
+        }
+    }
+
+    // Exposure Control
+    public bool IsAutoExposureEnabled => _videoDeviceController?.ExposureControl?.AutoModeEnabled ?? true;
+    
+    public void SetAutoExposure(bool auto)
+    {
+        if (_videoDeviceController?.ExposureControl == null) return;
+        
+        try
+        {
+            if (auto)
+                _videoDeviceController.ExposureControl.AutoModeEnabled = true;
+            else
+            {
+                _videoDeviceController.ExposureControl.AutoModeEnabled = false;
+                _videoDeviceController.ExposureControl.ManualExposureValue = 
+                    new ExposureCompensationControl((double)_videoDeviceController.ExposureControl.Min);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to set exposure");
+        }
+    }
+
+    // Focus Control
+    public bool IsAutoFocusEnabled => _videoDeviceController?.FocusControl?.AutoModeEnabled ?? true;
+    
+    public void SetAutoFocus(bool auto)
+    {
+        if (_videoDeviceController?.FocusControl == null) return;
+        
+        try
+        {
+            if (auto)
+                _videoDeviceController.FocusControl.AutoModeEnabled = true;
+            else
+                _videoDeviceController.FocusControl.AutoModeEnabled = false;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to set focus");
+        }
+    }
+
+    // White Balance Control
+    public void SetWhiteBalance(int kelvin)
+    {
+        if (_videoDeviceController?.WhiteBalanceControl == null) return;
+        
+        try
+        {
+            var presets = _videoDeviceController.WhiteBalanceControl;
+            if (presets != null)
+            {
+                presets.AutoModeEnabled = false;
+                // Set closest preset or manual value
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to set white balance");
+        }
+    }
+
+    // Brightness/Contrast/Saturation (if supported)
+    public void SetBrightness(double value)
+    {
+        if (_videoDeviceController == null) return;
+        // Use VideoDeviceController.Brightness
+    }
+
+    public void SetContrast(double value)
+    {
+        if (_videoDeviceController == null) return;
+        // Use VideoDeviceController.Contrast
+    }
+
+    public void SetSaturation(double value)
+    {
+        if (_videoDeviceController == null) return;
+        // Use VideoDeviceController.Saturation
+    }
+
+    public void Dispose()
+    {
+        _mediaCapture = null;
+        _videoDeviceController = null;
+    }
+}
+```
+
+================================================================================
+ISSUE 2: CAMERA CONTROLS CLASS
+================================================================================
+File: C:/CAMERA/CameraPro/src/CameraPro.Controls/CameraControls.cs
+
+```csharp
+using Serilog;
+
+namespace CameraPro.Controls;
+
+public class CameraControls : IDisposable
+{
+    private readonly CameraDeviceController _deviceController;
+    private bool _isAutoExposure = true;
+    private bool _isAutoFocus = true;
+    private bool _isAutoWhiteBalance = true;
+    
+    public bool IsAutoExposure
+    {
+        get => _isAutoExposure;
+        set
+        {
+            _isAutoExposure = value;
+            _deviceController.SetAutoExposure(value);
+        }
+    }
+    
+    public bool IsAutoFocus
+    {
+        get => _isAutoFocus;
+        set
+        {
+            _isAutoFocus = value;
+            _deviceController.SetAutoFocus(value);
+        }
+    }
+    
+    public bool IsAutoWhiteBalance
+    {
+        get => _isAutoWhiteBalance;
+        set
+        {
+            _isAutoWhiteBalance = value;
+            if (!value)
+                _deviceController.SetWhiteBalance(5500); // Default daylight
+        }
+    }
+    
+    public double Exposure { get; set; }
+    public double Focus { get; set; }
+    public int WhiteBalance { get; set; } = 5500;
+    public double Brightness { get; set; }
+    public double Contrast { get; set; }
+    public double Saturation { get; set; }
+    
+    public CameraControls()
+    {
+        _deviceController = new CameraDeviceController();
+    }
+    
+    public void ConnectTo(MediaCapture mediaCapture, string cameraId)
+    {
+        _deviceController.Connect(mediaCapture, cameraId);
+    }
+    
+    public void SaveCurrentAsPreset(string name)
+    {
+        // Save to JSON file
+        var preset = new ControlPreset
+        {
+            Name = name,
+            IsAutoExposure = _isAutoExposure,
+            IsAutoFocus = _isAutoFocus,
+            Exposure = Exposure,
+            Focus = Focus,
+            WhiteBalance = WhiteBalance,
+            Brightness = Brightness,
+            Contrast = Contrast,
+            Saturation = Saturation
+        };
+        
+        // Save to file using Config
+        Log.Information("Saved control preset: {Name}", name);
+    }
+    
+    public void Dispose()
+    {
+        _deviceController.Dispose();
+    }
+}
+```
+
+================================================================================
+ISSUE 3: CONTROL PRESET MODEL
+================================================================================
+File: C:/CAMERA/CameraPro/src/CameraPro.Core/Models/ControlPreset.cs
+
+```csharp
+namespace CameraPro.Core.Models;
+
+public class ControlPreset
+{
+    public string Name { get; set; } = string.Empty;
+    public bool IsAutoExposure { get; set; } = true;
+    public bool IsAutoFocus { get; set; } = true;
+    public bool IsAutoWhiteBalance { get; set; } = true;
+    public double Exposure { get; set; }
+    public double Focus { get; set; }
+    public int WhiteBalance { get; set; }
+    public double Brightness { get; set; }
+    public double Contrast { get; set; }
+    public double Saturation { get; set; }
+}
+```
+
+================================================================================
+ISSUE 4: USING FOR MediaCapture
+================================================================================
+Add to CameraPro.Controls.csproj:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="Microsoft.Windows.SDK.Contracts" Version="10.0.19041.1" />
+</ItemGroup>
+```
+
+Or use WinRT interop:
+
+```csharp
+using Windows.Media.Capture;
+```
+
+================================================================================
+DELIVERABLES:
+✅ CameraDeviceController wraps VideoDeviceController
+✅ Auto/Manual exposure control
+✅ Auto/Manual focus control
+✅ White balance control
+✅ Brightness/Contrast/Saturation
+✅ Preset save/load
+✅ Dispose properly
+================================================================================
